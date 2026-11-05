@@ -1,0 +1,11 @@
+# Zones où vivent les mobs (enlève les # pour essayer).
+# Un mob (« zone: » dans mobs/*.yml) ou un point d'apparition (« zone: » dans apparitions/*.yml) ne sort pas de sa zone.
+# Points d'intérêt : « nourriture » (mangeoire, champ), « eau » (abreuvoir, rive), « abri » (où dormir la nuit).
+#
+# paturage:
+#   monde: world
+#   rectangle: [100, -50, 140, -10]          # x1, z1, x2, z2 ; ou cercle: [x, z, rayon] ; ou polygone: [[x, z], [x, z], ...]
+#   points:
+#     - { type: eau, position: [120, 64, -12] }
+#     - { type: nourriture, position: [105, 64, -45] }
+#     - { type: abri, position: [138, 64, -48] }

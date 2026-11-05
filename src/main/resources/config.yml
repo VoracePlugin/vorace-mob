@@ -1,0 +1,4 @@
+# vorace-mob : les mobs vivent dans plugins/VoraceMob/mobs, zones et apparitions (exemples créés au premier démarrage).
+mobs:
+  # Un mob ne réfléchit que si un joueur est à moins de tant de blocs.
+  distance-reflexion: 64

@@ -1,0 +1,34 @@
+# Mobs de Vorace : un bloc par mob. /vorace mob invoquer <mob> pour essayer, /vorace mob info pour voir ce qu'il pense.
+# Chaque mob a des besoins (faim, soif, fatigue), des émotions (peur, colère) et choisit tout seul quoi faire :
+# se reposer, errer, manger, boire, dormir, rejoindre son troupeau, rentrer chez lui, fuir ou attaquer.
+
+golem_gardien:
+  nom: "Gardien de rubis"
+  type: iron_golem              # entité du jeu qui porte le mob (hitbox, sons, butin)
+  modele: golem_rubis           # modèle animé (modeles-animes/golem_rubis.bbmodel) ; liste = un au hasard
+  taille: [0.9, 1.1]            # taille tirée au hasard
+  vie: 60
+  degats: 6
+  caractere: territorial        # paisible, craintif, territorial ou agressif
+  activite: toujours            # diurne, nocturne ou toujours
+  laisse: 12                    # ne s'éloigne pas à plus de 12 blocs de l'endroit où il est apparu
+  detection: 8
+  boit: false
+  animations:
+    alerte: salut               # joué par-dessus quand il se fâche
+    ennui: [salut]              # joué de temps en temps au repos
+
+mouton_berger:
+  type: sheep                   # sans modèle : il garde l'apparence du jeu
+  caractere: paisible
+  troupeau: { cohesion: 6 }     # reste à moins de 6 blocs du centre de son troupeau
+  laisse: 20
+  nourriture: [grass_block, short_grass, tall_grass]
+
+lapin_craintif:
+  type: rabbit
+  caractere: craintif           # fuit les joueurs qui approchent (deux fois moins loin s'ils sont accroupis)
+  detection: 12
+  laisse: 16
+  vitesse: 1.2
+  nourriture: [short_grass, carrots, dandelion]

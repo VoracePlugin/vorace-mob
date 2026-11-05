@@ -1,0 +1,53 @@
+name: Essai Orario
+
+# Essai sur la vraie map d'Orario (serveur Babel d'Antoine ; extrait du serveur rangé dans la branche « essai-orario-donnees ») :
+# chaque espèce suivie, pigeons, bains d'oiseaux, redémarrage. Lancé par un commit dont le message contient [orario], ou à la main.
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  essai-orario:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[orario]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: |
+            21
+            25
+      - uses: gradle/actions/setup-gradle@v5
+        with:
+          gradle-version: "9.2.0"
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - uses: actions/checkout@v5
+        with:
+          repository: VoracePlugin/vorace-core
+          path: vorace-core
+      - name: Compiler vorace-core et vorace-mob
+        run: |
+          (cd vorace-core && gradle build -x test -PpaperApi="1.21.1-R0.1-SNAPSHOT")
+          gradle build -x test -PvoraceCore="$(ls $PWD/vorace-core/build/libs/Vorace-*.jar | head -1)"
+          cp vorace-core/build/libs/Vorace-*.jar build/libs/ && ls build/libs
+      - name: Serveur Orario (branche essai-orario-donnees)
+        id: donnees
+        run: |
+          # sans la branche des données (dépôt d'origine de Vorace par exemple), l'essai est sauté sans échec
+          if git fetch --depth 1 origin essai-orario-donnees; then
+            mkdir -p donnees && git show FETCH_HEAD:Orario_essai.zip > donnees/Orario_essai.zip && ls -la donnees
+            echo "presentes=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Pas de branche essai-orario-donnees dans ce dépôt : essai Orario sauté."
+            echo "presentes=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Faux joueur
+        if: steps.donnees.outputs.presentes == 'true'
+        run: cd outils && npm init -y > /dev/null && npm install --no-audit --no-fund mineflayer && pip install pyyaml
+      - name: Essai sur la map
+        if: steps.donnees.outputs.presentes == 'true'
+        run: outils/essai-orario.sh donnees/$(ls donnees | head -1) build/libs

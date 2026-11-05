@@ -1,0 +1,13 @@
+# Points d'apparition (enlève les # pour essayer) : une population gardée autour d'un endroit, qui devient la maison
+# de ces mobs. Un mob mort est remplacé après « reapparition » secondes. Rien n'apparaît si aucun joueur n'est à moins de 96 blocs.
+#
+# moutons_du_moulin:
+#   mob: mouton_berger                       # ou une liste : [mouton_berger, autre_mob]
+#   monde: world
+#   centre: [120, 64, -30]
+#   rayon: 6                                 # ils apparaissent dans ce rayon
+#   nombre: 5
+#   troupeau: true                           # tous du même troupeau
+#   laisse: 20                               # remplace la laisse du mob
+#   reapparition: 600
+#   zone: paturage

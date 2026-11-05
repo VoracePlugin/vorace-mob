@@ -1,0 +1,59 @@
+name: Compilation
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  compiler:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      # vorace-core (plugin « Vorace ») compilé depuis sa branche main : vorace-mob compile et s'essaie contre lui
+      - uses: actions/checkout@v5
+        with:
+          repository: VoracePlugin/vorace-core
+          path: vorace-core
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: |
+            21
+            25
+      - uses: gradle/actions/setup-gradle@v5
+        with:
+          gradle-version: "9.2.0"
+      - name: Compiler vorace-core
+        run: cd vorace-core && gradle build -x test -PpaperApi="1.21.1-R0.1-SNAPSHOT" && ls build/libs
+      - name: Compiler et tester vorace-mob
+        run: gradle build tests -PvoraceCore="$(ls $PWD/vorace-core/build/libs/Vorace-*.jar | head -1)"
+      - name: Garder les .jar
+        run: mkdir -p jars && cp vorace-core/build/libs/Vorace-*.jar build/libs/VoraceMob-*.jar jars/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: VoraceMob
+          path: jars/*.jar
+
+  # essai sur un vrai serveur Paper : les mobs pensent, fuient, s'envolent, bougent tout seuls (faux joueur)
+  essai-serveur:
+    needs: compiler
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          name: VoraceMob
+          path: jar
+      - name: Faux joueur
+        run: cd outils && npm init -y > /dev/null && npm install --no-audit --no-fund mineflayer
+      - name: Essai des mobs
+        run: outils/essai-serveur.sh 1.21.4 jar
