@@ -4,9 +4,6 @@ Des **mobs qui vivent**, pour serveurs Paper (Minecraft 1.21.4 à 26.x) : le rô
 Fait partie de [VoracePlugin](https://github.com/VoracePlugin) et a besoin de
 [vorace-core](https://github.com/VoracePlugin/vorace-core) (plugin `Vorace`), qui affiche les modèles animés.
 
-> **Code écrit par une IA.** Comme vorace-core, vorace-mob est écrit par Claude (l'IA d'Anthropic) ; ORA et Antoine
-> testent et décident de ce qui est ajouté.
-
 Les mobs étaient dans Vorace 1.1 ; ils en sont sortis pour que vorace-core reste léger (voir [CHANGELOG.md](CHANGELOG.md)).
 
 ## Ce que ça fait
