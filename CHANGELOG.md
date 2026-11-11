@@ -1,5 +1,13 @@
 # Journal des changements
 
+## 1.2.0 (novembre 2026) : Paper 1.21.4 au minimum
+
+VoraceMob demande maintenant un serveur **Paper 1.21.4 ou plus récent** (`api-version: '1.21.4'`), comme
+vorace-core 1.3.0 : il ne se charge plus sur 1.21 à 1.21.3. La dernière version pour ces serveurs est la 1.1.0.
+
+- Le plugin est compilé contre l'API Paper 1.21.4 (au lieu de 1.21.1), y compris la dépendance JitPack.
+- Le comportement des mobs, la commande `/vmob`, la config et l'API ne changent pas.
+
 ## 1.1.0 (novembre 2026) : sortie de Vorace
 
 Les mobs de Vorace 1.1 deviennent un plugin à part, **vorace-mob**, qui dépend de
