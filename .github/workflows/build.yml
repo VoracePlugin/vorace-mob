@@ -25,7 +25,7 @@ jobs:
         with:
           gradle-version: "9.2.0"
       - name: Compiler vorace-core
-        run: cd vorace-core && gradle build -x test -PpaperApi="1.21.1-R0.1-SNAPSHOT" && ls build/libs
+        run: cd vorace-core && gradle build -x test -PpaperApi="1.21.4-R0.1-SNAPSHOT" && ls build/libs
       - name: Compiler et tester vorace-mob
         run: gradle build tests -PvoraceCore="$(ls $PWD/vorace-core/build/libs/Vorace-*.jar | head -1)"
       - name: Garder les .jar

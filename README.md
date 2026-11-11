@@ -1,6 +1,6 @@
 # vorace-mob
 
-Des **mobs qui vivent**, pour serveurs Paper (Minecraft 1.21 à 26.x) : le rôle de MythicMobs, gratuit et libre.
+Des **mobs qui vivent**, pour serveurs Paper (Minecraft 1.21.4 à 26.x) : le rôle de MythicMobs, gratuit et libre.
 Fait partie de [VoracePlugin](https://github.com/VoracePlugin) et a besoin de
 [vorace-core](https://github.com/VoracePlugin/vorace-core) (plugin `Vorace`), qui affiche les modèles animés.
 
@@ -105,7 +105,7 @@ Puis `depend: [VoraceMob]` dans votre plugin.yml. `VoraceMobAPI.invoquerMob("mou
 
 ```
 gradle build tests                                   # vorace-core pris sur JitPack
-gradle build tests -PvoraceCore=../vorace-core/build/libs/Vorace-1.2.0.jar   # ou un vorace-core compilé à côté
+gradle build tests -PvoraceCore=../vorace-core/build/libs/Vorace-1.3.0.jar   # ou un vorace-core compilé à côté
 ```
 
 ## Essais automatiques

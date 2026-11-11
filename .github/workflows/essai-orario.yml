@@ -31,7 +31,7 @@ jobs:
           path: vorace-core
       - name: Compiler vorace-core et vorace-mob
         run: |
-          (cd vorace-core && gradle build -x test -PpaperApi="1.21.1-R0.1-SNAPSHOT")
+          (cd vorace-core && gradle build -x test -PpaperApi="1.21.4-R0.1-SNAPSHOT")
           gradle build -x test -PvoraceCore="$(ls $PWD/vorace-core/build/libs/Vorace-*.jar | head -1)"
           cp vorace-core/build/libs/Vorace-*.jar build/libs/ && ls build/libs
       - name: Serveur Orario (branche essai-orario-donnees)

@@ -1,7 +1,7 @@
 name: VoraceMob
 version: '${version}'
 main: fr.vorace.mobs.VoraceMob
-api-version: '1.21'
+api-version: '1.21.4'
 description: Mobs avec un cerveau (besoins, troupeaux, laisse, zones, apparitions, volants, décors vivants) pour Vorace
 authors: [ORA-KUN]
 website: https://github.com/VoracePlugin/vorace-mob

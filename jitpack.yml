@@ -5,4 +5,4 @@ before_install:
   - curl -fsSL -o gradle.zip https://services.gradle.org/distributions/gradle-9.2.0-bin.zip
   - unzip -q gradle.zip
 install:
-  - ./gradle-9.2.0/bin/gradle publishToMavenLocal -Pjdk=21 -PpaperApi=1.21.1-R0.1-SNAPSHOT
+  - ./gradle-9.2.0/bin/gradle publishToMavenLocal -Pjdk=21 -PpaperApi=1.21.4-R0.1-SNAPSHOT
