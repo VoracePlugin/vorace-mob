@@ -674,8 +674,8 @@ final class IACombat {
         if (dt < c.signal() + c.actif() && e.visee != null && (c.forme() == Competence.Forme.ZONE || c.forme() == Competence.Forme.CERCLE)) {
             effetZone(e.visee, c);
         }
-        if (dt >= c.duree()) {
-            e.prete.put(c.id(), e.t0 + Math.max(c.recharge(), c.duree()));
+        if (dt >= c.total()) {
+            e.prete.put(c.id(), e.t0 + Math.max(c.recharge(), c.total()));
             e.enCours = null;
             e.libreA = tic() + hasard.nextInt(6);
         }

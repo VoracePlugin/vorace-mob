@@ -67,7 +67,7 @@ public record Competence(String id, String nom, String animation, Forme forme, d
     }
 
     /** Durée totale (signal + actif + récupération), en tics. */
-    public int duree() { return signal + actif + recuperation; }
+    public int total() { return signal + actif + recuperation; }
 
     /** Couleur RGB de la zone marquée par défaut selon le type. */
     static int couleurDuType(String type) {

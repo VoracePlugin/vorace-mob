@@ -307,7 +307,7 @@ public final class TestMobs {
             && goutte.porteeMax() == 14 && goutte.signal() == 14 && goutte.recharge() == 40 && "g_flame_r".equals(goutte.depart())
             && goutte.magique() && goutte.type().equals("Fire") && goutte.couleur() == 0xFF7A1A, "Goutte ardente lue (projectile 6-14, signal 14)");
         verifier(pluie != null && pluie.forme() == Competence.Forme.ZONE && pluie.rayon() == 3 && pluie.signal() == 26 && pluie.actif() == 6
-            && pluie.duree() == 62 && pluie.couleur() == 0xFFB04A, "Pluie de suif lue (zone r 3, 62 tics)");
+            && pluie.total() == 62 && pluie.duree() == 3 && pluie.couleur() == 0xFFB04A, "Pluie de suif lue (zone r 3, 62 tics)");
         verifier(cm.coupDeBase() != null && cm.coupDeBase().forme() == Competence.Forme.CONTACT && cm.coupDeBase().signal() == 9
             && !cm.coupDeBase().magique() && cm.coupDeBase().type().equals("Impact") && cm.coupDeBase().animation() == null, "coup de base au contact, signal 9");
         verifier(cm.ia().distance() && cm.ia().distMin() == 6 && cm.ia().distMax() == 11 && cm.ia().aggro() == 14 && cm.ia().laisse() == 28, "IA à distance 6-11");
