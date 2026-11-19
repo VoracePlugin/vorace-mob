@@ -1,7 +1,11 @@
-# Mobs de combat : un bloc « combat: » donne au mob une Vie (gardée par vorace-mob), un niveau, un rang et des stats.
-# Le plugin du combat du serveur lit ces stats (formule de dégâts, esquive...) ; sans lui, 1 point de dégât du jeu
-# retire 1 % de la Vie. Au-dessus du mob : nom, niveau, et en combat sa barre de vie.
+# Mobs de combat : un bloc « combat: » donne au mob une Vie (gardée par vorace-mob), un niveau, un rang, des stats, un
+# cerveau de combat (aggro et menace, déplacements, attaques annoncées), un butin et, pour les élites ++ et les boss, des
+# phases et une barre de boss. Le plugin du combat du serveur lit les stats (formule de dégâts, esquive...) ; sans lui,
+# 1 point de dégât du jeu retire 1 % de la Vie et les coups des mobs font Puissance × multiplicateur / 20.
 # Modèle : plugins/Vorace/modeles-animes/cr_meche_sourde.bbmodel (sans modèle, il garde l'apparence du jeu).
+# Animations de combat reconnues (si le modèle les a) : idle_combat, walk_combat, run, walk_back, strafe_left,
+# strafe_right, flee, alert, get_up ; à renommer dans « animations: » (garde, marche-combat, course, recul, gauche,
+# droite, fuite, alerte, releve).
 
 cr_meche_sourde:
   nom: "Mèche-sourde"
@@ -17,8 +21,11 @@ cr_meche_sourde:
     niveau: 9                   # ou [8, 10] : tiré à l'apparition (/vmob invoquer <mob> [nombre] [niveau] pour l'imposer)
     vie: 330
     rang: normal                # normal, elite, elite++, mini-boss, boss
-    type: Fire                  # type de son coup de base
-    magique: true               # coup de base magique (puissance_mag) : c'est un lanceur
+    type: Fire                  # type de ses attaques (par défaut)
+    magique: true               # ses attaques utilisent sa Puissance magique
+    xp: 40                      # XP au niveau de base (le plugin du combat applique l'écart de niveau)
+    # progression par niveau d'écart avec le niveau de base (ici 9) : +10 % de Vie, +6 % de Puissance, +5 % de défense
+    progression: { vie: 0.10, puissance: 0.06, defense: 0.05, xp: 0.10 }
     stats:
       resistance: 12            # Résistance physique
       armure: 3                 # Armure physique (+1 Résistance physique par point)
@@ -28,3 +35,122 @@ cr_meche_sourde:
       vitesse: 0.2
       crit: 0.03
       esquive: 0.02
+    ia:
+      role: distance            # contact (va au corps à corps) ou distance (garde ses distances)
+      aggro: 14                 # le premier joueur vu à 14 blocs devient sa cible
+      laisse: 28                # trop loin de son point de départ : il abandonne, rentre et récupère sa Vie
+      distance: [6, 11]         # il recule sous 6 blocs, se rapproche au-delà de 11, tourne autour entre les deux
+      entraide: 8               # les Mèches-sourdes à 8 blocs le rejoignent
+    coup-de-base:               # coup de chandelier quand on le colle (animation « attack », le coup tombe au tic 9)
+      portee: 2.5
+      type: Impact
+      magique: false
+      multiplicateur: 0.8
+      signal: 9
+      recuperation: 8
+      recharge: 30
+    competences:
+      goutte_ardente:
+        nom: "Goutte ardente"
+        animation: atk_goutte_ardente
+        forme: projectile       # en cloche, zone d'impact marquée au sol pendant le vol : on peut l'esquiver
+        portee: [6, 14]
+        rayon: 1.5
+        multiplicateur: 1.0
+        signal: 14
+        actif: 1
+        recuperation: 8
+        recharge: 40
+        alteration: Brulure
+        duree: 3
+        depart: g_flame_r
+      pluie_de_suif:
+        nom: "Pluie de suif"
+        animation: atk_pluie_de_suif
+        forme: zone             # cercle posé sur la cible au début du signal, qui se remplit : sors-en à temps
+        portee: [3, 8]
+        rayon: 3
+        type: Fire
+        multiplicateur: 0.9
+        signal: 26
+        actif: 6
+        recuperation: 30
+        recharge: 240
+        alteration: Ralentissement
+        duree: 3
+        couleur: "#ffb04a"
+    butin:
+      - { objet: "vorace:cristal_bleu_nuit", chance: 1.0, nombre: [1, 2] }   # cristaux de Babel (installés par matsuri-coeur)
+      - { objet: "minecraft:honeycomb", chance: 0.25, nombre: 1 }            # un peu de cire
+
+# Essai d'élite ++ (barre de boss, phases, attaques annoncées, enrage) avec le même modèle, plus grand.
+cr_grande_meche:
+  nom: "Grande Mèche"
+  type: husk
+  modele: cr_meche_sourde
+  taille: 1.6
+  caractere: agressif
+  activite: toujours
+  laisse: 30
+  detection: 16
+  boit: false
+  silencieux: true
+  combat:
+    niveau: 10
+    vie: 3200
+    rang: elite++
+    type: Fire
+    magique: true
+    xp: 400
+    enrage: 300                 # au bout de 5 min de combat : dégâts × 1,5 et plus rapide
+    stats: { resistance: 30, armure: 10, res_mag: 20, puissance_phys: 120, puissance_mag: 110, crit: 0.05, esquive: 0 }
+    ia: { role: distance, aggro: 16, laisse: 32, distance: [5, 10], entraide: 0, vitesse: 0.9 }
+    coup-de-base: { portee: 3.2, type: Impact, magique: false, multiplicateur: 1.2, signal: 9, recuperation: 10, recharge: 30 }
+    competences:
+      goutte_ardente:
+        nom: "Goutte ardente"
+        animation: atk_goutte_ardente
+        forme: projectile
+        portee: [4, 16]
+        rayon: 2
+        signal: 14
+        recuperation: 8
+        recharge: 50
+        alteration: Brulure
+        duree: 4
+        depart: g_flame_r
+      pluie_de_suif:
+        nom: "Pluie de suif"
+        animation: atk_pluie_de_suif
+        forme: zone
+        portee: [0, 12]
+        rayon: 3.5
+        multiplicateur: 1.1
+        signal: 30
+        actif: 6
+        recuperation: 30
+        recharge: 220
+        alteration: Ralentissement
+        duree: 3
+        fixation: loin          # il vise le joueur le plus loin (marqué au-dessus de sa tête)
+        annonce: "<gold>La Grande Mèche lève ses chandeliers..."
+      cierge_abattu:
+        nom: "Cierge abattu"
+        animation: attack
+        forme: ligne
+        portee: [0, 7]
+        rayon: 7                # longueur
+        largeur: 2
+        type: Impact
+        magique: false
+        multiplicateur: 1.4
+        signal: 22
+        actif: 2
+        recuperation: 16
+        recharge: 160
+        phase: 1                # seulement à partir de la 2e phase
+    phases:
+      - { seuil: 0.6, nom: "Fêlure", annonce: "<red>La cire se fend ! Des Mèches-sourdes accourent.", invocation: { mob: cr_meche_sourde, nombre: 2 } }
+      - { seuil: 0.25, nom: "Fonte", annonce: "<dark_red>La Grande Mèche fond et s'emballe !", vitesse: 1.25 }
+    butin:
+      - { objet: "vorace:cristal_bleu_nuit", chance: 1.0, nombre: [4, 6] }

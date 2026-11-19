@@ -2,6 +2,7 @@ package fr.vorace.mobs;
 
 import org.bukkit.Location;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.Player;
 
 import java.util.Locale;
 
@@ -67,13 +68,13 @@ public final class VoraceMobAPI {
     /** Stat du mob de combat (« resistance », « puissance_phys »...), 0 si elle n'est pas écrite. */
     public static double stat(Entity e, String cle) {
         Mobs.Suivi s = combattant(e);
-        return s == null ? 0 : s.definition().combat().stat(cle);
+        return s == null ? 0 : s.definition().combat().stat(cle, s.niveau);
     }
 
     /** Toutes les stats écrites du mob de combat (vide si ce n'en est pas un). */
     public static java.util.Map<String, Double> stats(Entity e) {
         Mobs.Suivi s = combattant(e);
-        return s == null ? java.util.Map.of() : s.definition().combat().stats();
+        return s == null ? java.util.Map.of() : s.definition().combat().statsAuNiveau(s.niveau);
     }
 
     /** Vie actuelle du mob de combat, ou 0. */
@@ -94,8 +95,88 @@ public final class VoraceMobAPI {
      * Hors d'un événement : {@code entite.damage(infliger(entite, montant), source)} dans le même tic.
      */
     public static double infliger(Entity e, double montant) {
+        return infliger(e, montant, null);
+    }
+
+    /** Comme {@link #infliger(Entity, double)} ; {@code source} : le joueur qui frappe (menace 1 par dégât, butin). */
+    public static double infliger(Entity e, double montant, Entity source) {
         Mobs.Suivi s = combattant(e);
-        return s == null ? -1 : plugin.mobs().combats().infliger(s, montant);
+        return s == null ? -1 : plugin.mobs().combats().infliger(s, montant, source instanceof Player p ? p : null);
+    }
+
+    /** Nom affiché du mob (« Mèche-sourde »), ou null si ce n'est pas un mob de Vorace. */
+    public static String nom(Entity e) {
+        Mobs m = mobs();
+        Mobs.Suivi s = m == null ? null : m.suivi(e);
+        return s == null ? null : s.definition().nom() != null ? s.definition().nom() : s.definition().id();
+    }
+
+    /** Vrai si le mob de combat est en combat (il a une cible). */
+    public static boolean enCombat(Entity e) {
+        Mobs.Suivi s = combattant(e);
+        return s != null && s.ia != null && s.ia.engage;
+    }
+
+    /** Cible actuelle du mob de combat, ou null. */
+    public static Player cible(Entity e) {
+        Mobs.Suivi s = combattant(e);
+        return s == null || s.ia == null || s.ia.cible == null ? null : org.bukkit.Bukkit.getPlayer(s.ia.cible);
+    }
+
+    /** Ajoute de la menace (compétences de menace, Présence menaçante...). Faux si ce n'est pas un mob de combat. */
+    public static boolean ajouterMenace(Entity e, Player joueur, double montant) {
+        Mobs.Suivi s = combattant(e);
+        if (s == null) return false;
+        plugin.mobs().ia().ajouterMenace(s, joueur, montant);
+        return true;
+    }
+
+    /**
+     * Menace d'un soin : 0,5 par point de Vie rendu à {@code soigne}, partagée entre les mobs de combat qui l'ont dans leur
+     * table (ils se tournent vers le soigneur).
+     */
+    public static void menaceDeSoin(Player soigneur, Player soigne, double soin) {
+        Mobs m = mobs();
+        if (m == null || soin <= 0) return;
+        java.util.List<Mobs.Suivi> l = new java.util.ArrayList<>();
+        for (Mobs.Suivi s : m.suivis()) if (s.ia != null && s.ia.engage && s.ia.menace.containsKey(soigne.getUniqueId())) l.add(s);
+        for (Mobs.Suivi s : l) m.ia().ajouterMenace(s, soigneur, soin * 0.5 / l.size());
+    }
+
+    /**
+     * Contrôle posé par le plugin du combat : pendant {@code ms}, le mob ne bouge plus ({@code bouger} faux) et/ou
+     * n'attaque plus ({@code agir} faux : une attaque en train d'être annoncée est interrompue). Étourdissement,
+     * Pétrification : (false, false) ; Enracinement : (false, true).
+     */
+    public static boolean entraver(Entity e, long ms, boolean bouger, boolean agir) {
+        Mobs.Suivi s = combattant(e);
+        if (s == null) return false;
+        plugin.mobs().ia().entraver(s, ms, bouger, agir);
+        return true;
+    }
+
+    /** Provocation : le mob prend aussitôt ce joueur pour cible ; à la fin, il garde 110 % de la plus haute menace. */
+    public static boolean provoquer(Entity e, Player joueur, long ms) {
+        Mobs.Suivi s = combattant(e);
+        if (s == null) return false;
+        plugin.mobs().ia().provoquer(s, joueur, ms);
+        return true;
+    }
+
+    /** Aveuglement : la menace de sa cible est divisée par 2, il en cherche une autre. */
+    public static boolean aveugler(Entity e, long ms) {
+        Mobs.Suivi s = combattant(e);
+        if (s == null) return false;
+        plugin.mobs().ia().aveugler(s, ms);
+        return true;
+    }
+
+    /** Peur : il fuit loin de {@code source} pendant {@code ms} (son cerveau de combat s'en charge). */
+    public static boolean fuir(Entity e, Entity source, long ms) {
+        Mobs.Suivi s = combattant(e);
+        if (s == null) return false;
+        plugin.mobs().ia().fuir(s, source, ms);
+        return true;
     }
 
     /** Rend de la Vie au mob de combat. Faux si ce n'en est pas un. */

@@ -300,6 +300,42 @@ public final class TestMobs {
             "barre à moitié : 10 traits jaunes sur 20");
         verifier(Combat.barre(1, 330, 20).startsWith("<#e04848>|<#3a3a3a>"), "presque mort : un trait rouge reste");
 
+        // cerveau de combat : attaques, IA, butin, progression, phases
+        Combat cm = meche.combat();
+        Competence goutte = cm.competence("goutte_ardente"), pluie = cm.competence("pluie_de_suif");
+        verifier(cm.competences().size() == 2 && goutte != null && goutte.forme() == Competence.Forme.PROJECTILE && goutte.porteeMin() == 6
+            && goutte.porteeMax() == 14 && goutte.signal() == 14 && goutte.recharge() == 40 && "g_flame_r".equals(goutte.depart())
+            && goutte.magique() && goutte.type().equals("Fire") && goutte.couleur() == 0xFF7A1A, "Goutte ardente lue (projectile 6-14, signal 14)");
+        verifier(pluie != null && pluie.forme() == Competence.Forme.ZONE && pluie.rayon() == 3 && pluie.signal() == 26 && pluie.actif() == 6
+            && pluie.duree() == 62 && pluie.couleur() == 0xFFB04A, "Pluie de suif lue (zone r 3, 62 tics)");
+        verifier(cm.coupDeBase() != null && cm.coupDeBase().forme() == Competence.Forme.CONTACT && cm.coupDeBase().signal() == 9
+            && !cm.coupDeBase().magique() && cm.coupDeBase().type().equals("Impact") && cm.coupDeBase().animation() == null, "coup de base au contact, signal 9");
+        verifier(cm.ia().distance() && cm.ia().distMin() == 6 && cm.ia().distMax() == 11 && cm.ia().aggro() == 14 && cm.ia().laisse() == 28, "IA à distance 6-11");
+        verifier(cm.butin().size() == 2 && cm.butin().get(0).objet().equals("vorace:cristal_bleu_nuit") && cm.butin().get(0).min() == 1
+            && cm.butin().get(0).max() == 2 && cm.butin().get(1).chance() == 0.25 && cm.xp() == 40, "butin et XP lus");
+        verifier(Math.abs(cm.stat("puissance_mag", 12) - 66 * 1.18) < 1e-9 && Math.abs(cm.vieAuNiveau(12) - 429) < 1e-9 && cm.stat("esquive", 12) == 0.02
+            && Math.abs(cm.stat("resistance", 7) - 12 * 0.9) < 1e-9 && cm.stat("puissance_mag", 9) == 66 && Math.abs(cm.xpAuNiveau(11) - 48) < 1e-9,
+            "niveau 12 : Vie 429, Puissance ×1,18 ; esquive inchangée");
+        CoupMob cg = CoupMob.de(cm, 12, goutte, 1.5);
+        verifier(Math.abs(cg.puissance() - 66 * 1.18) < 1e-9 && cg.multiplicateur() == 1.5 && "Brulure".equals(cg.alteration()) && cg.duree() == 3
+            && cg.nom().equals("Goutte ardente"), "coup d'une attaque au niveau du mob");
+        DefinitionMob grande = DefinitionMob.lire("cr_grande_meche", yc.getConfigurationSection("cr_grande_meche"), pb);
+        pb.forEach(x -> System.out.println("  problème : " + x));
+        verifier(pb.isEmpty() && grande.combat().rang() == Combat.Rang.ELITE_PP && grande.combat().enrage() == 300 && grande.combat().phases().size() == 2
+            && grande.combat().phases().get(0).seuil() == 0.6 && "cr_meche_sourde".equals(grande.combat().phases().get(0).invocation())
+            && grande.combat().phases().get(0).nombre() == 2 && grande.combat().phases().get(1).vitesse() == 1.25
+            && grande.combat().competence("cierge_abattu").forme() == Competence.Forme.LIGNE && grande.combat().competence("cierge_abattu").phase() == 1
+            && "loin".equals(grande.combat().competence("pluie_de_suif").fixation()), "Grande Mèche : élite ++, phases, fixation, ligne");
+        java.util.Map<java.util.UUID, Double> dg = new java.util.HashMap<>();
+        java.util.UUID ja = java.util.UUID.randomUUID(), jb = java.util.UUID.randomUUID(), jc = java.util.UUID.randomUUID();
+        dg.put(ja, 120.0); dg.put(jb, 100.0); dg.put(jc, 110.0);
+        verifier(ja.equals(Butin.gagnant(dg)) && Butin.gagnant(java.util.Map.of()) == null, "butin : personne à 50,01 % → celui qui a fait le plus");
+        verifier(Combats.palier(165, 330) == 25 && Combats.palier(1, 330) == 1 && Combats.palier(0, 330) == 0 && Combats.palier(330, 330) == 50,
+            "barre : 50 paliers, 1 au moins tant qu'il vit");
+        String bg = Combats.barreGlyphes(165, 200, 330, Combat.Rang.ELITE);
+        verifier(bg.contains("<glyphe:vmob_vie_25>") && bg.contains("<glyphe:vmob_traine_30>") && bg.contains("vmob_cadre_elite>")
+            && bg.split("decalage:-51", -1).length == 4, "barre en glyphes : fond, traîne, Vie, cadre superposés");
+
         System.out.println(echecs == 0 ? "TOUS LES TESTS PASSENT" : echecs + " ECHEC(S)");
         System.exit(echecs == 0 ? 0 : 1);
     }

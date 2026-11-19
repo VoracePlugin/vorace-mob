@@ -34,9 +34,13 @@ final class CommandeMob implements TabExecutor {
         List<String> r = new ArrayList<>();
         if (!s.hasPermission("vorace.mob.admin")) return r;
         if (a.length == 1) {
-            for (String o : List.of("liste", "invoquer", "info", "apparitions", "retirer", "recharger")) if (o.startsWith(a[0].toLowerCase(Locale.ROOT))) r.add(o);
+            for (String o : List.of("liste", "invoquer", "info", "menace", "butin", "apparitions", "retirer", "recharger")) if (o.startsWith(a[0].toLowerCase(Locale.ROOT))) r.add(o);
         } else if (a.length == 2 && a[0].equalsIgnoreCase("invoquer") && plugin.mobs() != null) {
             for (DefinitionMob d : plugin.mobs().definitions()) if (d.id().startsWith(a[1].toLowerCase(Locale.ROOT))) r.add(d.id());
+        } else if (a.length == 2 && a[0].equalsIgnoreCase("butin") && plugin.mobs() != null) {
+            for (DefinitionMob d : plugin.mobs().definitions()) if (d.combattant() && d.id().startsWith(a[1].toLowerCase(Locale.ROOT))) r.add(d.id());
+        } else if (a.length == 2 && a[0].equalsIgnoreCase("menace")) {
+            for (String o : List.of("8", "16", "32")) if (o.startsWith(a[1])) r.add(o);
         } else if (a.length == 3 && a[0].equalsIgnoreCase("invoquer")) {
             for (String o : List.of("1", "3", "5", "8")) if (o.startsWith(a[2])) r.add(o);
         } else if (a.length == 4 && a[0].equalsIgnoreCase("invoquer") && plugin.mobs() != null) {
@@ -103,6 +107,31 @@ final class CommandeMob implements TabExecutor {
                 if (e.isValid()) e.remove();
                 s.sendMessage(Messages.brut("<green>Mob retiré."));
             }
+            case "menace" -> {
+                // état de combat du mob de combat le plus proche : cible, mode, attaque, table de menace
+                if (p == null) { s.sendMessage(Messages.brut("<red>Commande de joueur.")); return; }
+                double rayon = 16;
+                try { if (a.length > 2) rayon = Double.parseDouble(a[2]); } catch (NumberFormatException ignore) { }
+                Mobs.Suivi x = null;
+                double best = rayon * rayon;
+                for (Mobs.Suivi o : m.suivis()) {
+                    if (!o.d.combattant() || !o.e.getWorld().equals(p.getWorld())) continue;
+                    double d = o.e.getLocation().distanceSquared(p.getLocation());
+                    if (d < best) { best = d; x = o; }
+                }
+                if (x == null) { s.sendMessage(Messages.brut("<yellow>Aucun mob de combat à moins de " + (int) rayon + " blocs.")); return; }
+                s.sendMessage(Messages.brut("<white>" + Messages.echapper(x.d.id()) + " <gray>" + Combats.etat(x).trim() + "\n" + IACombat.etat(x)));
+            }
+            case "butin" -> {
+                if (a.length < 3) { s.sendMessage(Messages.brut("<red>Utilisation : /vmob butin <mob>")); return; }
+                DefinitionMob d = m.definition(a[2]);
+                if (d == null || !d.combattant()) { s.sendMessage(Messages.brut("<red>Mob de combat inconnu : " + Messages.echapper(a[2]))); return; }
+                s.sendMessage(Messages.brut("<gray>Butin de <white>" + d.id() + "<gray> (" + d.combat().butin().size() + " ligne(s), XP " + Math.round(d.combat().xp()) + ") :"));
+                for (Combat.Lot l : d.combat().butin()) s.sendMessage(Messages.mini("<gray> - <white>" + Messages.echapper(l.objet()) + " <gray>× "
+                    + l.min() + (l.max() > l.min() ? "-" + l.max() : "") + ", " + Math.round(l.chance() * 100) + " %"));
+                List<String> inconnus = m.butin().problemes(d.combat());
+                if (!inconnus.isEmpty()) s.sendMessage(Messages.brut("<red>Objets inconnus : " + Messages.echapper(String.join(", ", inconnus))));
+            }
             case "recharger" -> {
                 plugin.recharger();
                 s.sendMessage(Messages.brut("<green>Mobs, zones et apparitions relus."));
@@ -112,7 +141,7 @@ final class CommandeMob implements TabExecutor {
                     + " point(s) d'apparition, " + m.suivis().size() + " mob(s) chargé(s) :"));
                 for (DefinitionMob d : m.definitions()) s.sendMessage(Messages.brut("<white> " + Messages.echapper(d.id()) + " <gray>("
                     + Messages.echapper(d.type()) + ", " + d.caractere().name().toLowerCase(Locale.ROOT) + (d.modeles().isEmpty() ? "" : ", modèle " + Messages.echapper(String.join("/", d.modeles()))) + ")"));
-                s.sendMessage(Messages.brut("<gray>/vmob invoquer <mob> [nombre] [niveau] | info [début du nom|*] [joueur] | apparitions | retirer [rayon] | recharger"));
+                s.sendMessage(Messages.brut("<gray>/vmob invoquer <mob> [nombre] [niveau] | info [début du nom|*] [joueur] | menace [rayon] | butin <mob> | apparitions | retirer [rayon] | recharger"));
             }
         }
     }

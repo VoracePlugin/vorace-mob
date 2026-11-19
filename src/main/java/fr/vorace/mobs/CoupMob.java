@@ -15,8 +15,14 @@ package fr.vorace.mobs;
 public record CoupMob(double puissance, boolean magique, String type, double multiplicateur, String alteration,
                       double duree, String nom) {
 
-    /** Le coup de base d'un mob de combat. */
+    /** Le coup de base d'un mob de combat (au niveau de base). */
     public static CoupMob deBase(Combat c) {
         return new CoupMob(c.stat(c.magique() ? "puissance_mag" : "puissance_phys"), c.magique(), c.type(), 1, null, 0, "coup de base");
+    }
+
+    /** Le coup d'une attaque, au niveau du mob ; {@code bonus} multiplie (enrage d'un boss). */
+    public static CoupMob de(Combat c, int niveau, Competence a, double bonus) {
+        return new CoupMob(c.stat(a.magique() ? "puissance_mag" : "puissance_phys", niveau), a.magique(), a.type(),
+            a.multiplicateur() * bonus, a.alteration(), a.duree(), a.nom());
     }
 }

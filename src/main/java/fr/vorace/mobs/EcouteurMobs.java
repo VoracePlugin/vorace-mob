@@ -10,6 +10,9 @@ import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.entity.EntityRegainHealthEvent;
+import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.world.EntitiesLoadEvent;
 import org.bukkit.event.world.EntitiesUnloadEvent;
 
@@ -63,5 +66,27 @@ public final class EcouteurMobs implements Listener {
             e.setDroppedExp(0);
         }
         plugin.mobs().mort(e.getEntity());
+    }
+
+    /** Pendant un coup porté par vorace-mob, vorace-core ne relance pas l'animation d'attaque (elle a déjà joué). */
+    @EventHandler(ignoreCancelled = true)
+    public void animation(fr.vorace.api.VoraceModeleAnimationEvent e) {
+        Mobs.Suivi s = plugin.mobs() == null ? null : plugin.mobs().suivi(e.getBase());
+        if (s != null && s.sansAnimAuto) e.setCancelled(true);
+    }
+
+    @EventHandler
+    public void mortJoueur(PlayerDeathEvent e) {
+        if (plugin.mobs() != null) plugin.mobs().ia().oublier(e.getEntity());
+    }
+
+    @EventHandler
+    public void depart(PlayerQuitEvent e) {
+        if (plugin.mobs() != null) plugin.mobs().ia().oublier(e.getPlayer());
+    }
+
+    @EventHandler
+    public void monde(PlayerChangedWorldEvent e) {
+        if (plugin.mobs() != null) plugin.mobs().ia().oublier(e.getPlayer());
     }
 }

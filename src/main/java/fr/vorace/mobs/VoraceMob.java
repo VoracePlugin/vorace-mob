@@ -32,6 +32,34 @@ public final class VoraceMob extends JavaPlugin {
     /** Les mobs, ou null s'ils n'ont pas pu démarrer. */
     public Mobs mobs() { return mobs; }
 
+    /**
+     * Avant que Vorace ne démarre : installe (ou met à jour) les glyphes de la barre de vie des mobs de combat dans
+     * plugins/Vorace (glyphes/vorace-mob-barre.yml et ressources/textures/vorace-mob/barre/).
+     */
+    @Override
+    public void onLoad() {
+        Path vorace = getDataFolder().toPath().getParent().resolve("Vorace");
+        try {
+            List<String> images = new java.util.ArrayList<>(List.of("fond", "cadre_normal", "cadre_elite", "cadre_elite_pp", "cadre_boss"));
+            for (int k = 0; k <= 50; k++) { images.add(String.format("vie_%02d", k)); images.add(String.format("traine_%02d", k)); }
+            copier("glyphes/vorace-mob-barre.yml", vorace.resolve("glyphes").resolve("vorace-mob-barre.yml"));
+            Path dossier = vorace.resolve("ressources").resolve("textures").resolve("vorace-mob").resolve("barre");
+            for (String i : images) copier("glyphes/barre/" + i + ".png", dossier.resolve(i + ".png"));
+        } catch (IOException | RuntimeException e) {
+            getLogger().warning("Glyphes de la barre de vie non installés : " + e.getMessage());
+        }
+    }
+
+    private void copier(String ressource, Path cible) throws IOException {
+        try (java.io.InputStream in = getClass().getClassLoader().getResourceAsStream(ressource)) {
+            if (in == null) throw new IOException("ressource absente : " + ressource);
+            byte[] contenu = in.readAllBytes();
+            if (Files.isRegularFile(cible) && java.util.Arrays.equals(Files.readAllBytes(cible), contenu)) return;
+            Files.createDirectories(cible.getParent());
+            Files.write(cible, contenu);
+        }
+    }
+
     @Override
     public void onEnable() {
         if (!(Bukkit.getPluginManager().getPlugin("Vorace") instanceof Vorace v) || !v.isEnabled()) {

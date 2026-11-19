@@ -1,0 +1,645 @@
+# Glyphes de la barre de vie des mobs de combat (installés et mis à jour par vorace-mob à chaque démarrage).
+# Images : plugins/Vorace/ressources/textures/vorace-mob/barre/ (200 x 24, affichées à 6 px de haut).
+
+vmob_fond:
+  texture: vorace-mob/barre/fond
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_cadre_normal:
+  texture: vorace-mob/barre/cadre_normal
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_cadre_elite:
+  texture: vorace-mob/barre/cadre_elite
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_cadre_elite_pp:
+  texture: vorace-mob/barre/cadre_elite_pp
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_cadre_boss:
+  texture: vorace-mob/barre/cadre_boss
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_00:
+  texture: vorace-mob/barre/vie_00
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_00:
+  texture: vorace-mob/barre/traine_00
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_01:
+  texture: vorace-mob/barre/vie_01
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_01:
+  texture: vorace-mob/barre/traine_01
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_02:
+  texture: vorace-mob/barre/vie_02
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_02:
+  texture: vorace-mob/barre/traine_02
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_03:
+  texture: vorace-mob/barre/vie_03
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_03:
+  texture: vorace-mob/barre/traine_03
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_04:
+  texture: vorace-mob/barre/vie_04
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_04:
+  texture: vorace-mob/barre/traine_04
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_05:
+  texture: vorace-mob/barre/vie_05
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_05:
+  texture: vorace-mob/barre/traine_05
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_06:
+  texture: vorace-mob/barre/vie_06
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_06:
+  texture: vorace-mob/barre/traine_06
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_07:
+  texture: vorace-mob/barre/vie_07
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_07:
+  texture: vorace-mob/barre/traine_07
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_08:
+  texture: vorace-mob/barre/vie_08
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_08:
+  texture: vorace-mob/barre/traine_08
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_09:
+  texture: vorace-mob/barre/vie_09
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_09:
+  texture: vorace-mob/barre/traine_09
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_10:
+  texture: vorace-mob/barre/vie_10
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_10:
+  texture: vorace-mob/barre/traine_10
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_11:
+  texture: vorace-mob/barre/vie_11
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_11:
+  texture: vorace-mob/barre/traine_11
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_12:
+  texture: vorace-mob/barre/vie_12
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_12:
+  texture: vorace-mob/barre/traine_12
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_13:
+  texture: vorace-mob/barre/vie_13
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_13:
+  texture: vorace-mob/barre/traine_13
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_14:
+  texture: vorace-mob/barre/vie_14
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_14:
+  texture: vorace-mob/barre/traine_14
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_15:
+  texture: vorace-mob/barre/vie_15
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_15:
+  texture: vorace-mob/barre/traine_15
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_16:
+  texture: vorace-mob/barre/vie_16
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_16:
+  texture: vorace-mob/barre/traine_16
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_17:
+  texture: vorace-mob/barre/vie_17
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_17:
+  texture: vorace-mob/barre/traine_17
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_18:
+  texture: vorace-mob/barre/vie_18
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_18:
+  texture: vorace-mob/barre/traine_18
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_19:
+  texture: vorace-mob/barre/vie_19
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_19:
+  texture: vorace-mob/barre/traine_19
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_20:
+  texture: vorace-mob/barre/vie_20
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_20:
+  texture: vorace-mob/barre/traine_20
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_21:
+  texture: vorace-mob/barre/vie_21
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_21:
+  texture: vorace-mob/barre/traine_21
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_22:
+  texture: vorace-mob/barre/vie_22
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_22:
+  texture: vorace-mob/barre/traine_22
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_23:
+  texture: vorace-mob/barre/vie_23
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_23:
+  texture: vorace-mob/barre/traine_23
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_24:
+  texture: vorace-mob/barre/vie_24
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_24:
+  texture: vorace-mob/barre/traine_24
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_25:
+  texture: vorace-mob/barre/vie_25
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_25:
+  texture: vorace-mob/barre/traine_25
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_26:
+  texture: vorace-mob/barre/vie_26
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_26:
+  texture: vorace-mob/barre/traine_26
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_27:
+  texture: vorace-mob/barre/vie_27
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_27:
+  texture: vorace-mob/barre/traine_27
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_28:
+  texture: vorace-mob/barre/vie_28
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_28:
+  texture: vorace-mob/barre/traine_28
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_29:
+  texture: vorace-mob/barre/vie_29
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_29:
+  texture: vorace-mob/barre/traine_29
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_30:
+  texture: vorace-mob/barre/vie_30
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_30:
+  texture: vorace-mob/barre/traine_30
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_31:
+  texture: vorace-mob/barre/vie_31
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_31:
+  texture: vorace-mob/barre/traine_31
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_32:
+  texture: vorace-mob/barre/vie_32
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_32:
+  texture: vorace-mob/barre/traine_32
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_33:
+  texture: vorace-mob/barre/vie_33
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_33:
+  texture: vorace-mob/barre/traine_33
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_34:
+  texture: vorace-mob/barre/vie_34
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_34:
+  texture: vorace-mob/barre/traine_34
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_35:
+  texture: vorace-mob/barre/vie_35
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_35:
+  texture: vorace-mob/barre/traine_35
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_36:
+  texture: vorace-mob/barre/vie_36
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_36:
+  texture: vorace-mob/barre/traine_36
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_37:
+  texture: vorace-mob/barre/vie_37
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_37:
+  texture: vorace-mob/barre/traine_37
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_38:
+  texture: vorace-mob/barre/vie_38
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_38:
+  texture: vorace-mob/barre/traine_38
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_39:
+  texture: vorace-mob/barre/vie_39
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_39:
+  texture: vorace-mob/barre/traine_39
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_40:
+  texture: vorace-mob/barre/vie_40
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_40:
+  texture: vorace-mob/barre/traine_40
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_41:
+  texture: vorace-mob/barre/vie_41
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_41:
+  texture: vorace-mob/barre/traine_41
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_42:
+  texture: vorace-mob/barre/vie_42
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_42:
+  texture: vorace-mob/barre/traine_42
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_43:
+  texture: vorace-mob/barre/vie_43
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_43:
+  texture: vorace-mob/barre/traine_43
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_44:
+  texture: vorace-mob/barre/vie_44
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_44:
+  texture: vorace-mob/barre/traine_44
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_45:
+  texture: vorace-mob/barre/vie_45
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_45:
+  texture: vorace-mob/barre/traine_45
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_46:
+  texture: vorace-mob/barre/vie_46
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_46:
+  texture: vorace-mob/barre/traine_46
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_47:
+  texture: vorace-mob/barre/vie_47
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_47:
+  texture: vorace-mob/barre/traine_47
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_48:
+  texture: vorace-mob/barre/vie_48
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_48:
+  texture: vorace-mob/barre/traine_48
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_49:
+  texture: vorace-mob/barre/vie_49
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_49:
+  texture: vorace-mob/barre/traine_49
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_vie_50:
+  texture: vorace-mob/barre/vie_50
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
+vmob_traine_50:
+  texture: vorace-mob/barre/traine_50
+  hauteur: 6
+  montee: 6
+  raccourcis: false
+  liste: false
