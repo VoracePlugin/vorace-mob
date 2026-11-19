@@ -263,8 +263,11 @@ final class Combats {
     /** Pour /vmob info. */
     static String etat(Mobs.Suivi s) {
         if (!s.d.combattant()) return "";
+        org.bukkit.entity.Player c = s.ia == null || s.ia.cible == null ? null : Bukkit.getPlayer(s.ia.cible);
         String ia = s.ia == null ? "" : String.format(Locale.ROOT, " combat=%s mode=%s attaques=%d", s.ia.engage ? "oui" : s.ia.rentre ? "rentre" : "non",
-            s.ia.mode, s.ia.attaques);
+            s.ia.mode, s.ia.attaques)
+            + (c != null && c.getWorld().equals(s.e.getWorld()) ? String.format(Locale.ROOT, " cible=%.1f vue=%s", c.getLocation().distance(s.e.getLocation()),
+                s.e instanceof LivingEntity le && le.hasLineOfSight(c) ? "oui" : "non") : "");
         return String.format(Locale.ROOT, " niveau=%d vie=%.0f/%.0f rang=%s", s.niveau, s.vie, s.vieMax, s.d.combat().rang().nom()) + ia;
     }
 }

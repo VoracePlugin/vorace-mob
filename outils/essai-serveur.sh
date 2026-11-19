@@ -145,13 +145,16 @@ sleep 23
 cmd "vmob info zoo_"
 # mobs de combat : joueur en survie (protégé), ils le repèrent, se placent, attaquent (coups annoncés, projectiles)
 cmd "gamemode survival Testeur"
+cmd "tp Testeur 1.5 -60 -6.5"
 cmd "effect give Testeur resistance 120 4 true"
 cmd "effect give Testeur regeneration 120 4 true"
 cmd "vmob invoquer cr_meche_sourde 2"
 cmd "vmob invoquer cr_grande_meche"
-sleep 9
+sleep 5
 cmd "vmob info cr_"
-sleep 7
+sleep 5
+cmd "vmob info cr_"
+sleep 5
 cmd "vmob info cr_"
 cmd "vmob menace 32"
 wait $BOT
