@@ -1,5 +1,47 @@
 # Journal des changements
 
+## 1.4.0 (novembre 2026) : cerveau de combat
+
+Retours de l'essai de la 1.3.0 :
+- **Barre de vie dessinée** (glyphes installés dans Vorace au démarrage) : fond sombre, Vie rouge en dégradé avec crans
+  de 10 %, **traîne claire** des derniers dégâts qui rattrape la Vie, cadre selon le rang (fer, or, violet, rouge à
+  pointes) ; fond gris de l'étiquette retiré. Plus de « Vorace » devant le nom.
+- Le coup de base tombe **quand l'animation frappe** (signal de 9 tics) au lieu de lancer l'animation au moment du coup.
+- Le **niveau compte** : progression par niveau d'écart avec le niveau de base (`progression:`, par défaut +10 % de
+  Vie, +6 % de Puissance, +5 % de défense, +10 % d'XP par niveau).
+
+Cerveau de combat (bloc `combat.ia`, `combat.competences`, `combat.coup-de-base`) :
+- **Menace** : premier joueur vu (distance d'aggro, en vue) à 10, 1 par dégât, le plus proche × 1,1, changement de
+  cible à 110 % (cible à 5 blocs ou moins) ou 130 %, hors de vue plus de 5 s : −10 %/s, 8 mobs au plus par joueur (le
+  plus ancien oublie), mort, départ ou changement de monde : oublié ; les mobs du même type autour le rejoignent
+  (`entraide`). Trop loin de chez lui ou plus personne : il **rentre** en courant et récupère sa Vie.
+- **Déplacements** : rôle `contact` (va au corps à corps) ou `distance` (garde sa bande de distance : recule face à la
+  cible, se rapproche par le chemin, **tourne autour en pas chassés** avec des pauses, s'écarte des alliés, saute les
+  marches, ne se jette pas dans un trou). Regarde toujours sa cible. Petit sursaut d'alerte quand il te repère.
+- **Attaques annoncées** : signal (animation, zone marquée au sol qui se remplit), actif, récupération, recharge ;
+  formes contact, projectile en cloche (impact marqué pendant le vol, bloqué par les murs), zone posée sur la cible,
+  cercle autour de lui, cône, ligne ; os de départ du projectile ; altération du coup ; poids ; seulement sous X % de Vie
+  ou à partir d'une phase.
+- **Contrôles** (API, pour le plugin du combat) : `entraver` (étourdi, enraciné : une attaque en train d'être annoncée
+  est interrompue), `provoquer`, `aveugler`, `fuir` ; réactions aux compétences de vorace-core (saisi, plaqué,
+  soulevé, projeté) subies, puis `get_up` pour se relever.
+- **Élites ++ et boss** : barre de boss (élite ++ violette, mini-boss et boss rouges), phases à des seuils de Vie
+  (annonce, animation, vitesse, invocations), attaques annoncées en sous-titre, **Fixation** (`fixation: hasard`,
+  `loin`, `proche` : cible choisie par le script, marquée au-dessus de sa tête), **enrage** (`enrage: 300` : dégâts ×
+  1,5 et plus rapide).
+- **Butin** (`combat.butin`) : objets du jeu ou de Vorace (`vorace:<id>`), chance, nombre ; à 50,01 % des dégâts, sinon
+  au joueur qui en a fait le plus ; objets réservés au gagnant ; événement `VoraceMobMortEvent` (dégâts, gagnant, XP,
+  objets) pour le plugin du combat ; XP du jeu sinon.
+- Animations de combat reconnues : `idle_combat`, `walk_combat`, `run`, `walk_back`, `strafe_left`, `strafe_right`,
+  `flee`, `alert`, `get_up` (renommables dans `animations:`).
+- Commandes : `/vmob menace [rayon]` (cible, mode, attaque, table de menace du mob le plus proche), `/vmob butin <mob>`,
+  `/vmob point <mob> [nombre] [rayon] [réapparition]` (point d'apparition à ta position, `apparitions/points.yml`),
+  `/vmob point retirer <id>`. API : `nom`, `enCombat`, `cible`, `ajouterMenace`, `menaceDeSoin`, `entraver`,
+  `provoquer`, `aveugler`, `fuir`, `infliger(entité, montant, source)`.
+- Exemple `mobs/combat.yml` : la Mèche-sourde complète (Goutte ardente, Pluie de suif, coup de chandelier, cristaux) et
+  la Grande Mèche, essai d'élite ++ (phases, invocations, Fixation, Cierge abattu, enrage). L'exemple de la 1.3.0 est
+  remplacé s'il n'a pas été modifié.
+
 ## 1.3.0 (novembre 2026) : mobs de combat
 
 Un bloc `combat:` fait d'un mob un **mob de combat** (voir `mobs/combat.yml`, installé au démarrage) :

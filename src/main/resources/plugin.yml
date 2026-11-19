@@ -9,7 +9,7 @@ depend: [Vorace]
 commands:
   vmob:
     description: Mobs de vorace-mob
-    usage: /vmob [liste|invoquer <mob> [nombre] [niveau]|menace [rayon]|butin <mob>|info [début|*] [joueur]|apparitions|retirer [rayon]|recharger]
+    usage: /vmob [liste|invoquer <mob> [nombre] [niveau]|menace [rayon]|butin <mob>|point <mob> [nombre] [rayon] [réapparition]|info [début|*] [joueur]|apparitions|retirer [rayon]|recharger]
     aliases: [voracemob]
     permission: vorace.mob.admin
 permissions:
