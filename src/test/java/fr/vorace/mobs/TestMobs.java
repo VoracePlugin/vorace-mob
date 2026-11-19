@@ -319,6 +319,7 @@ public final class TestMobs {
         CoupMob cg = CoupMob.de(cm, 12, goutte, 1.5);
         verifier(Math.abs(cg.puissance() - 66 * 1.18) < 1e-9 && cg.multiplicateur() == 1.5 && "Brulure".equals(cg.alteration()) && cg.duree() == 3
             && cg.nom().equals("Goutte ardente"), "coup d'une attaque au niveau du mob");
+        pb.clear();
         DefinitionMob grande = DefinitionMob.lire("cr_grande_meche", yc.getConfigurationSection("cr_grande_meche"), pb);
         pb.forEach(x -> System.out.println("  problème : " + x));
         verifier(pb.isEmpty() && grande.combat().rang() == Combat.Rang.ELITE_PP && grande.combat().enrage() == 300 && grande.combat().phases().size() == 2
