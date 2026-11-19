@@ -264,6 +264,42 @@ public final class TestMobs {
         }
         verifier(toujoursAuSol && aMarche && aPicore && chemin > 3, "pigeon : marche au sol puis s'arrête (" + String.format("%.1f", chemin) + " blocs en 20 s)");
 
+        // combat : bloc « combat: », rang, niveau, Vie du jeu, barre
+        String cb;
+        try (InputStream in = TestMobs.class.getClassLoader().getResourceAsStream("exemples/mobs/combat.yml")) {
+            cb = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        }
+        YamlConfiguration yc = YamlConfiguration.loadConfiguration(new java.io.StringReader(cb));
+        pb.clear();
+        DefinitionMob meche = DefinitionMob.lire("cr_meche_sourde", yc.getConfigurationSection("cr_meche_sourde"), pb);
+        pb.forEach(x -> System.out.println("  problème : " + x));
+        verifier(pb.isEmpty() && meche.combattant() && meche.combat().vie() == 330 && meche.combat().niveauMin() == 9
+            && meche.combat().rang() == Combat.Rang.NORMAL && meche.combat().stat("resistance") == 12 && meche.combat().stat("RES_MAG") == 0
+            && meche.combat().stat("esquive") == 0.02 && meche.combat().magique() && meche.combat().type().equals("Fire"), "Mèche-sourde : combat lu");
+        verifier(CoupMob.deBase(meche.combat()).puissance() == 66 && CoupMob.deBase(meche.combat()).magique(), "coup de base : Puissance magique 66");
+        verifier(!golem.combattant(), "mob sans bloc combat : Vie du jeu");
+        verifier(Combat.Rang.lire("elite++") == Combat.Rang.ELITE_PP && Combat.Rang.lire("élite") == Combat.Rang.ELITE
+            && Combat.Rang.lire("mini-boss") == Combat.Rang.MINI_BOSS && Combat.Rang.lire("boss_fin") == Combat.Rang.BOSS
+            && Combat.Rang.lire("essaim") == Combat.Rang.NORMAL && Combat.Rang.lire("dragon") == null
+            && Combat.Rang.BOSS.boss() && Combat.Rang.MINI_BOSS.boss() && !Combat.Rang.ELITE_PP.boss() && Combat.Rang.ELITE_PP.elite(), "rangs lus");
+        YamlConfiguration yn = YamlConfiguration.loadConfiguration(new java.io.StringReader(String.join("\n",
+            "a: { type: husk, combat: { niveau: [8, 10], vie: 20100, rang: boss } }", "b: { type: husk, combat: { niveau: 3 } }",
+            "c: { type: husk, combat: { vie: 10, rang: dieu, stats: { force: beaucoup } } }")));
+        pb.clear();
+        DefinitionMob ba = DefinitionMob.lire("a", yn.getConfigurationSection("a"), pb);
+        verifier(ba.combat().niveauMin() == 8 && ba.combat().niveauMax() == 10 && ba.combat().tirerNiveau(0) == 8 && ba.combat().tirerNiveau(0.999) == 10
+            && ba.combat().tirerNiveau(0.5) == 9, "niveau tiré entre 8 et 10");
+        verifier(DefinitionMob.lire("b", yn.getConfigurationSection("b"), pb).combat() == null && pb.size() == 1, "combat sans Vie ignoré et signalé");
+        pb.clear();
+        DefinitionMob bc = DefinitionMob.lire("c", yn.getConfigurationSection("c"), pb);
+        verifier(bc.combat().rang() == Combat.Rang.NORMAL && pb.size() == 2, "rang et stat mal écrits signalés");
+        verifier(Combat.santeDuJeu(20100, 20100, 100) == 100 && Combat.santeDuJeu(10050, 20100, 100) == 50 && Combat.santeDuJeu(1, 20100, 100) == 0.5
+            && Combat.santeDuJeu(0, 20100, 100) == 0, "santé du jeu : même proportion que la Vie (0,5 au moins tant qu'il vit)");
+        String barre = Combat.barre(165, 330, 20);
+        verifier(barre.startsWith("<#e8c547>") && barre.chars().filter(ch -> ch == '|').count() == 20 && barre.contains("<#3a3a3a>" + "|".repeat(10)),
+            "barre à moitié : 10 traits jaunes sur 20");
+        verifier(Combat.barre(1, 330, 20).startsWith("<#e04848>|<#3a3a3a>"), "presque mort : un trait rouge reste");
+
         System.out.println(echecs == 0 ? "TOUS LES TESTS PASSENT" : echecs + " ECHEC(S)");
         System.exit(echecs == 0 ? 0 : 1);
     }

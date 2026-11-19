@@ -1,0 +1,30 @@
+# Mobs de combat : un bloc « combat: » donne au mob une Vie (gardée par vorace-mob), un niveau, un rang et des stats.
+# Le plugin du combat du serveur lit ces stats (formule de dégâts, esquive...) ; sans lui, 1 point de dégât du jeu
+# retire 1 % de la Vie. Au-dessus du mob : nom, niveau, et en combat sa barre de vie.
+# Modèle : plugins/Vorace/modeles-animes/cr_meche_sourde.bbmodel (sans modèle, il garde l'apparence du jeu).
+
+cr_meche_sourde:
+  nom: "Mèche-sourde"
+  type: husk                    # porteur sans armure et qui ne brûle pas au soleil
+  modele: cr_meche_sourde
+  caractere: agressif
+  activite: toujours
+  laisse: 24
+  detection: 14
+  boit: false
+  silencieux: true
+  combat:
+    niveau: 9                   # ou [8, 10] : tiré à l'apparition (/vmob invoquer <mob> [nombre] [niveau] pour l'imposer)
+    vie: 330
+    rang: normal                # normal, elite, elite++, mini-boss, boss
+    type: Fire                  # type de son coup de base
+    magique: true               # coup de base magique (puissance_mag) : c'est un lanceur
+    stats:
+      resistance: 12            # Résistance physique
+      armure: 3                 # Armure physique (+1 Résistance physique par point)
+      res_mag: 0                # Résistance magique
+      puissance_phys: 75
+      puissance_mag: 66
+      vitesse: 0.2
+      crit: 0.03
+      esquive: 0.02

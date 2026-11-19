@@ -11,7 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-/** /vmob [liste|invoquer &lt;mob&gt; [nombre]|info [début|*] [joueur]|apparitions|retirer [rayon]|recharger] */
+/** /vmob [liste|invoquer &lt;mob&gt; [nombre] [niveau]|info [début|*] [joueur]|apparitions|retirer [rayon]|recharger] */
 final class CommandeMob implements TabExecutor {
 
     private final VoraceMob plugin;
@@ -37,6 +37,14 @@ final class CommandeMob implements TabExecutor {
             for (String o : List.of("liste", "invoquer", "info", "apparitions", "retirer", "recharger")) if (o.startsWith(a[0].toLowerCase(Locale.ROOT))) r.add(o);
         } else if (a.length == 2 && a[0].equalsIgnoreCase("invoquer") && plugin.mobs() != null) {
             for (DefinitionMob d : plugin.mobs().definitions()) if (d.id().startsWith(a[1].toLowerCase(Locale.ROOT))) r.add(d.id());
+        } else if (a.length == 3 && a[0].equalsIgnoreCase("invoquer")) {
+            for (String o : List.of("1", "3", "5", "8")) if (o.startsWith(a[2])) r.add(o);
+        } else if (a.length == 4 && a[0].equalsIgnoreCase("invoquer") && plugin.mobs() != null) {
+            // niveau imposé : les niveaux possibles du mob de combat
+            DefinitionMob d = plugin.mobs().definition(a[1]);
+            if (d != null && d.combattant()) {
+                for (int n = d.combat().niveauMin(); n <= d.combat().niveauMax() && r.size() < 20; n++) if (String.valueOf(n).startsWith(a[3])) r.add(String.valueOf(n));
+            }
         } else if (a.length == 3 && a[0].equalsIgnoreCase("info")) {
             Bukkit.getOnlinePlayers().forEach(p -> r.add(p.getName()));
             r.removeIf(x -> !x.toLowerCase(Locale.ROOT).startsWith(a[2].toLowerCase(Locale.ROOT)));
@@ -53,15 +61,17 @@ final class CommandeMob implements TabExecutor {
         org.bukkit.Location ici = p != null ? p.getLocation() : org.bukkit.Bukkit.getWorlds().get(0).getSpawnLocation();
         switch (act) {
             case "invoquer" -> {
-                if (a.length < 3) { s.sendMessage(Messages.brut("<red>Utilisation : /vmob invoquer <mob> [nombre]")); return; }
+                if (a.length < 3) { s.sendMessage(Messages.brut("<red>Utilisation : /vmob invoquer <mob> [nombre] [niveau]")); return; }
                 DefinitionMob d = m.definition(a[2]);
                 if (d == null) { s.sendMessage(Messages.brut("<red>Mob inconnu : " + Messages.echapper(a[2]))); return; }
                 int n = 1;
                 try { if (a.length > 3) n = Math.max(1, Math.min(32, Integer.parseInt(a[3]))); } catch (NumberFormatException ignore) { }
+                int niveau = 0;
+                try { if (a.length > 4) niveau = Math.max(1, Integer.parseInt(a[4])); } catch (NumberFormatException ignore) { }
                 org.bukkit.Location ou = p != null ? p.getLocation() : new org.bukkit.Location(ici.getWorld(), ici.getBlockX() + 0.5, ici.getBlockY(), ici.getBlockZ() - 8.5);
                 String troupeau = n > 1 && d.cohesion() > 0 ? "invoques-" + Long.toString(System.nanoTime(), 36) : null;
                 int faits = 0;
-                for (int k = 0; k < n; k++) if (m.invoquer(d.id(), ou.clone().add((k % 3) - 1, 0, (k / 3) - 1), null, troupeau) != null) faits++;
+                for (int k = 0; k < n; k++) if (m.invoquer(d.id(), ou.clone().add((k % 3) - 1, 0, (k / 3) - 1), null, troupeau, niveau) != null) faits++;
                 s.sendMessage(Messages.brut("<green>" + faits + " " + Messages.echapper(d.id()) + " invoqué(s)" + (troupeau != null ? " en troupeau." : ".")));
             }
             case "info" -> {
@@ -102,7 +112,7 @@ final class CommandeMob implements TabExecutor {
                     + " point(s) d'apparition, " + m.suivis().size() + " mob(s) chargé(s) :"));
                 for (DefinitionMob d : m.definitions()) s.sendMessage(Messages.brut("<white> " + Messages.echapper(d.id()) + " <gray>("
                     + Messages.echapper(d.type()) + ", " + d.caractere().name().toLowerCase(Locale.ROOT) + (d.modeles().isEmpty() ? "" : ", modèle " + Messages.echapper(String.join("/", d.modeles()))) + ")"));
-                s.sendMessage(Messages.brut("<gray>/vmob invoquer <mob> [nombre] | info [début du nom|*] [joueur] | apparitions | retirer [rayon] | recharger"));
+                s.sendMessage(Messages.brut("<gray>/vmob invoquer <mob> [nombre] [niveau] | info [début du nom|*] [joueur] | apparitions | retirer [rayon] | recharger"));
             }
         }
     }

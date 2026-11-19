@@ -63,6 +63,7 @@ public final class Mobs {
     private double distanceReflexion = 64;
     private volatile String derniereErreur;
     private boolean erreurJournalisee;
+    private final Combats combats;
 
     /** Mobs suivis d'un point d'apparition (gardés dans donnees/apparitions.yml). */
     static final class EtatApparition {
@@ -79,7 +80,11 @@ public final class Mobs {
         cleTroupeau = NamespacedKey.fromString("vorace:mob_troupeau");
         cleApparition = NamespacedKey.fromString("vorace:mob_apparition");
         cleBesoins = NamespacedKey.fromString("vorace:mob_besoins");
+        combats = new Combats(plugin);
     }
+
+    /** Vie, niveau et barre des mobs de combat. */
+    Combats combats() { return combats; }
 
     public Path dossier() { return plugin.getDataFolder().toPath(); }
     public Collection<DefinitionMob> definitions() { return definitions.values(); }
@@ -190,6 +195,14 @@ public final class Mobs {
         /** Pensées d'affilée sans un pas alors qu'il veut se déplacer. */
         int bloque, coince;
         double avantX = Double.NaN, avantZ;
+        /** Mob de combat : Vie, Vie maximale, niveau, dernier coup reçu ou donné, tic du dernier coup déjà compté. */
+        double vie, vieMax;
+        int niveau, compteTic = -1;
+        long dernierCombat;
+        String texteNom;
+        boolean dansEquipe;
+        /** Le coup que le mob porte en ce moment (lu par le plugin du combat pendant l'événement de dégâts). */
+        CoupMob coupEnCours;
 
         Suivi(Entity e, DefinitionMob d) {
             this.e = e;
@@ -214,7 +227,7 @@ public final class Mobs {
                 apparition == null ? "" : " apparition=" + apparition) + String.format(Locale.ROOT, " parcouru=%.1f", parcouru)
                 + (vol != null ? String.format(Locale.ROOT, " a-pied=%.1f", vol.parcouru()) : "")
                 + String.format(Locale.ROOT, " pos=%.1f,%.1f,%.1f", l.getX(), l.getY(), l.getZ())
-                + effetsJoues();
+                + Combats.etat(this) + effetsJoues();
         }
 
         /** Décors vivants : sons et particules joués par leurs animations (preuve que l'animation tourne en jeu). */
@@ -287,6 +300,7 @@ public final class Mobs {
                 if (d.marche() > 0) s.vol.marcheur(d.marche());
             }
             suivis.put(e.getUniqueId(), s);
+            if (d.combattant()) combats.charger(s);
             if (s.apparition != null) {
                 EtatApparition et = registre.computeIfAbsent(s.apparition, k -> new EtatApparition());
                 if (et.membres.add(e.getUniqueId())) registreModifie = true;
@@ -324,6 +338,7 @@ public final class Mobs {
     /** Mort (ou retrait) : le point d'apparition le remplacera après son délai. */
     public void mort(Entity e) {
         Suivi s = suivis.remove(e.getUniqueId());
+        if (s != null && s.d.combattant()) combats.mort(s);
         String app = s != null ? s.apparition : e.getPersistentDataContainer().get(cleApparition, PersistentDataType.STRING);
         if (app == null) return;
         EtatApparition et = registre.get(app);
@@ -339,6 +354,7 @@ public final class Mobs {
         Suivi s = suivis.get(e.getUniqueId());
         if (s == null) return;
         s.c.blesser(s.d.caractere());
+        if (s.d.combattant()) s.dernierCombat = System.currentTimeMillis();
         if (par != null) s.menace = par;
         if (s.vol != null) {
             Location m = par != null ? par.getLocation() : e.getLocation();
@@ -362,6 +378,11 @@ public final class Mobs {
      * @param apparition point d'apparition (ou null), troupeau : identifiant de troupeau (ou null)
      */
     public Entity invoquer(String id, Location ou, String apparition, String troupeau) {
+        return invoquer(id, ou, apparition, troupeau, 0);
+    }
+
+    /** Comme {@link #invoquer(String, Location, String, String)} ; niveau &gt; 0 : niveau imposé (mob de combat). */
+    public Entity invoquer(String id, Location ou, String apparition, String troupeau, int niveau) {
         DefinitionMob d = definition(id);
         if (d == null || ou.getWorld() == null) return null;
         Modeles modeles = plugin.modeles();
@@ -385,7 +406,7 @@ public final class Mobs {
             e.setPersistent(true);
             if (e instanceof LivingEntity le) {
                 le.setRemoveWhenFarAway(false);
-                if (d.vie() > 0) {
+                if (d.vie() > 0 && !d.combattant()) {
                     AttributeInstance vie = attribut(le, "max_health");
                     if (vie != null) {
                         vie.setBaseValue(d.vie());
@@ -405,6 +426,10 @@ public final class Mobs {
         pdc.set(cleMaison, PersistentDataType.STRING, String.format(Locale.ROOT, "%.2f;%.2f;%.2f", mx, my, mz));
         if (troupeau != null) pdc.set(cleTroupeau, PersistentDataType.STRING, troupeau);
         if (apparition != null) pdc.set(cleApparition, PersistentDataType.STRING, apparition);
+        if (d.combattant()) {
+            int n = niveau > 0 ? niveau : d.combat().tirerNiveau(hasard.nextDouble());
+            pdc.set(combats.cle(), PersistentDataType.STRING, String.format(Locale.ROOT, "%.2f;%d", d.combat().vie(), n));
+        }
         charger(List.of(e));
         return e;
     }
@@ -517,6 +542,9 @@ public final class Mobs {
         }
         if (tic % 600 == 0 && registreModifie) sauverRegistre();
         if (tic % 1200 == 0) for (Suivi s : suivis.values()) sauverBesoins(s);
+        if (tic % 10 == 0) {
+            try { combats.tic(suivis.values()); } catch (Throwable ex) { erreur("combat", ex); }
+        }
         for (Suivi s : suivis.values()) {
             if (s.vol == null || !s.actif || !s.e.isValid()) continue;
             try { voler(s); } catch (Throwable ex) { erreur(s.d.id(), ex); }
@@ -891,7 +919,14 @@ public final class Mobs {
                     mob.getPathfinder().stopPathfinding();
                     if (tic - s.dernierCoup >= 24) {
                         s.dernierCoup = tic;
-                        menace.damage(s.d.degats(), mob);
+                        if (s.d.combattant()) {
+                            // le plugin du combat lit ce coup pendant l'événement de dégâts (Puissance, type...)
+                            s.dernierCombat = System.currentTimeMillis();
+                            s.coupEnCours = CoupMob.deBase(s.d.combat());
+                            try { menace.damage(Math.max(1, s.d.degats()), mob); } finally { s.coupEnCours = null; }
+                        } else {
+                            menace.damage(s.d.degats(), mob);
+                        }
                     }
                 } else if (tic >= s.prochainPlan) {
                     mob.getPathfinder().moveTo(menace, v * 1.3);
@@ -1031,21 +1066,34 @@ public final class Mobs {
         try {
             Path liste = dossier().resolve("donnees").resolve("exemples.txt");
             List<String> faits = new ArrayList<>(Files.isRegularFile(liste) ? Files.readAllLines(liste) : List.of());
-            if (faits.contains("mobs")) return;
-            for (String f : List.of("mobs/exemple.yml", "zones/exemple.yml", "apparitions/exemple.yml")) {
-                Path cible = dossier().resolve(f);
-                if (Files.exists(cible)) continue;
-                try (InputStream in = plugin.getClass().getClassLoader().getResourceAsStream("exemples/" + f)) {
-                    if (in == null) continue;
-                    Files.createDirectories(cible.getParent());
-                    Files.copy(in, cible);
-                }
+            // chaque lot d'exemples n'est installé qu'une fois (supprimer sa ligne de donnees/exemples.txt pour le récupérer)
+            Map<String, List<String>> lots = new LinkedHashMap<>();
+            lots.put("mobs", List.of("mobs/exemple.yml", "zones/exemple.yml", "apparitions/exemple.yml"));
+            lots.put("combat", List.of("mobs/combat.yml"));
+            boolean change = false;
+            for (Map.Entry<String, List<String>> lot : lots.entrySet()) {
+                if (faits.contains(lot.getKey())) continue;
+                installer(lot.getValue());
+                faits.add(lot.getKey());
+                change = true;
             }
-            faits.add("mobs");
+            if (!change) return;
             Files.createDirectories(liste.getParent());
             Files.write(liste, faits);
         } catch (IOException e) {
             plugin.getLogger().warning("Impossible de créer l'exemple de mobs : " + e.getMessage());
+        }
+    }
+
+    private void installer(List<String> fichiers) throws IOException {
+        for (String f : fichiers) {
+            Path cible = dossier().resolve(f);
+            if (Files.exists(cible)) continue;
+            try (InputStream in = plugin.getClass().getClassLoader().getResourceAsStream("exemples/" + f)) {
+                if (in == null) continue;
+                Files.createDirectories(cible.getParent());
+                Files.copy(in, cible);
+            }
         }
     }
 }

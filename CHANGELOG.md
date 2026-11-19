@@ -1,5 +1,21 @@
 # Journal des changements
 
+## 1.3.0 (novembre 2026) : mobs de combat
+
+Un bloc `combat:` fait d'un mob un **mob de combat** (voir `mobs/combat.yml`, installé au démarrage) :
+
+- **Vie** gardée par vorace-mob (elle peut dépasser les 1 024 de santé du jeu) ; la santé du jeu suit la même proportion
+  sur 100 pour la mort et le tueur. Le jeu ne le soigne pas tout seul ; son armure du jeu est à 0.
+- **Niveau** fixe ou tiré dans une fourchette (`niveau: [8, 10]`), **rang** (normal, elite, elite++, mini-boss, boss) et
+  **stats libres** (`stats:`), lues par le plugin du combat du serveur.
+- **Nom, niveau et barre de vie** au-dessus du mob, au point `tag_` de son modèle : nom coloré selon le rang, barre
+  (verte, jaune, rouge) et Vie visibles pendant le combat et 10 s après. Le nom du jeu au survol est caché.
+- Dégâts qui ne passent pas par le plugin du combat (feu, chute, serveur sans plugin de combat) : 1 point du jeu = 1 %
+  de la Vie. Rien du jeu ne tombe à sa mort (le butin viendra des tables de butin).
+- API : `estCombattant`, `niveau`, `rang`, `stat`, `stats`, `vie`, `vieMax`, `infliger`, `soigner`, `coupEnCours`
+  (record `CoupMob` : Puissance, physique ou magique, type, multiplicateur, altération) pendant le coup du mob.
+- `/vmob invoquer <mob> [nombre] [niveau]` (niveau imposé, auto-complété), `/vmob info` montre niveau, Vie et rang.
+
 ## 1.2.0 (novembre 2026) : Paper 1.21.4 au minimum
 
 VoraceMob demande maintenant un serveur **Paper 1.21.4 ou plus récent** (`api-version: '1.21.4'`), comme
