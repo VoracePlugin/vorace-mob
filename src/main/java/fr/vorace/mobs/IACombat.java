@@ -60,7 +60,7 @@ final class IACombat {
         Competence enCours;
         Location visee;
         Vector direction;
-        int sens = 1, phase;
+        int sens = 1, phase, attaques;
         String mode = "garde", anim;
         double vitessePhase = 1, bonus = 1;
         BossBar barre;
@@ -691,6 +691,7 @@ final class IACombat {
     }
 
     private void executer(Mobs.Suivi s, Mob mob, Competence c, Player vise) {
+        s.ia.attaques++;
         Location l = mob.getLocation();
         World w = l.getWorld();
         switch (c.forme()) {
