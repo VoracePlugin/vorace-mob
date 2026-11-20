@@ -264,6 +264,121 @@ public final class TestMobs {
         }
         verifier(toujoursAuSol && aMarche && aPicore && chemin > 3, "pigeon : marche au sol puis s'arrête (" + String.format("%.1f", chemin) + " blocs en 20 s)");
 
+        // combat : bloc « combat: », rang, niveau, Vie du jeu, barre
+        String cb;
+        try (InputStream in = TestMobs.class.getClassLoader().getResourceAsStream("exemples/mobs/combat.yml")) {
+            cb = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        }
+        YamlConfiguration yc = YamlConfiguration.loadConfiguration(new java.io.StringReader(cb));
+        pb.clear();
+        DefinitionMob meche = DefinitionMob.lire("cr_meche_sourde", yc.getConfigurationSection("cr_meche_sourde"), pb);
+        pb.forEach(x -> System.out.println("  problème : " + x));
+        verifier(pb.isEmpty() && meche.combattant() && meche.combat().vie() == 330 && meche.combat().niveauMin() == 9
+            && meche.combat().rang() == Combat.Rang.NORMAL && meche.combat().stat("resistance") == 12 && meche.combat().stat("RES_MAG") == 0
+            && meche.combat().stat("esquive") == 0.02 && meche.combat().magique() && meche.combat().type().equals("Fire"), "Mèche-sourde : combat lu");
+        verifier(CoupMob.deBase(meche.combat()).puissance() == 66 && CoupMob.deBase(meche.combat()).magique(), "coup de base : Puissance magique 66");
+        verifier(!golem.combattant(), "mob sans bloc combat : Vie du jeu");
+        verifier(Combat.Rang.lire("elite++") == Combat.Rang.ELITE_PP && Combat.Rang.lire("élite") == Combat.Rang.ELITE
+            && Combat.Rang.lire("mini-boss") == Combat.Rang.MINI_BOSS && Combat.Rang.lire("boss_fin") == Combat.Rang.BOSS
+            && Combat.Rang.lire("essaim") == Combat.Rang.NORMAL && Combat.Rang.lire("dragon") == null
+            && Combat.Rang.BOSS.boss() && Combat.Rang.MINI_BOSS.boss() && !Combat.Rang.ELITE_PP.boss() && Combat.Rang.ELITE_PP.elite(), "rangs lus");
+        YamlConfiguration yn = YamlConfiguration.loadConfiguration(new java.io.StringReader(String.join("\n",
+            "a: { type: husk, combat: { niveau: [8, 10], vie: 20100, rang: boss } }", "b: { type: husk, combat: { niveau: 3 } }",
+            "c: { type: husk, combat: { vie: 10, rang: dieu, stats: { force: beaucoup } } }")));
+        pb.clear();
+        DefinitionMob ba = DefinitionMob.lire("a", yn.getConfigurationSection("a"), pb);
+        verifier(ba.combat().niveauMin() == 8 && ba.combat().niveauMax() == 10 && ba.combat().tirerNiveau(0) == 8 && ba.combat().tirerNiveau(0.999) == 10
+            && ba.combat().tirerNiveau(0.5) == 9, "niveau tiré entre 8 et 10");
+        verifier(DefinitionMob.lire("b", yn.getConfigurationSection("b"), pb).combat() == null && pb.size() == 1, "combat sans Vie ignoré et signalé");
+        pb.clear();
+        DefinitionMob bc = DefinitionMob.lire("c", yn.getConfigurationSection("c"), pb);
+        verifier(bc.combat().rang() == Combat.Rang.NORMAL && pb.size() == 2, "rang et stat mal écrits signalés");
+        verifier(Combat.santeDuJeu(20100, 20100, 100) == 100 && Combat.santeDuJeu(10050, 20100, 100) == 50 && Combat.santeDuJeu(1, 20100, 100) == 0.5
+            && Combat.santeDuJeu(0, 20100, 100) == 0, "santé du jeu : même proportion que la Vie (0,5 au moins tant qu'il vit)");
+        String barre = Combat.barre(165, 330, 20);
+        verifier(barre.startsWith("<#e8c547>") && barre.chars().filter(ch -> ch == '|').count() == 20 && barre.contains("<#3a3a3a>" + "|".repeat(10)),
+            "barre à moitié : 10 traits jaunes sur 20");
+        verifier(Combat.barre(1, 330, 20).startsWith("<#e04848>|<#3a3a3a>"), "presque mort : un trait rouge reste");
+
+        // cerveau de combat : attaques, IA, butin, progression, phases
+        Combat cm = meche.combat();
+        Competence goutte = cm.competence("goutte_ardente"), pluie = cm.competence("pluie_de_suif");
+        Competence salve = cm.competence("salve_ardente"), eclab = cm.competence("eclaboussure");
+        verifier(cm.competences().size() == 4 && goutte != null && goutte.forme() == Competence.Forme.PROJECTILE && goutte.porteeMin() == 3.5
+            && goutte.porteeMax() == 16 && goutte.signal() == 8 && goutte.recharge() == 40 && "g_flame_r".equals(goutte.depart(0))
+            && goutte.magique() && goutte.type().equals("Fire") && goutte.couleur() == 0xFF7A1A && goutte.vitesse() == 1.1
+            && goutte.anticipation() == 0.6 && goutte.total() == 14 && !goutte.lourde() && goutte.presse() == 0 && "fx_cire_goutte".equals(goutte.effets().projectile())
+            && goutte.effets().flaque() == null, "Goutte ardente lue (projectile rapide, anticipation, effets)");
+        verifier(salve != null && salve.salve() == 3 && salve.intervalle() == 5 && salve.total() == 27 && "g_flame_l".equals(salve.depart(1))
+            && "g_flame_c".equals(salve.depart(2)) && "g_flame_r".equals(salve.depart(3)) && salve.flaque() == 40 && salve.flaqueMult() == 0.25 && salve.lourde(),
+            "Salve ardente lue (3 tirs, 27 tics, un os par tir, flaques)");
+        verifier(pluie != null && pluie.forme() == Competence.Forme.ZONE && pluie.rayon() == 2.6 && pluie.signal() == 18 && pluie.zones() == 2
+            && pluie.dispersion() == 4 && pluie.total() == 43 && pluie.duree() == 3 && "fx_cire_pluie".equals(pluie.effets().pluie()),
+            "Pluie de suif lue (2 zones, 43 tics)");
+        verifier(eclab != null && eclab.forme() == Competence.Forme.CERCLE && eclab.porteeMax() == 2.6 && eclab.repousse() == 0.8
+            && eclab.bond() == -4 && eclab.total() == 21 && eclab.presse() == 2 && eclab.lourde(),
+            "Éclaboussure lue (cercle, repousse, bond en arrière, seulement après 2 coups reçus)");
+        // rythme d'un groupe : une attaque à la fois sur un joueur, une lourde à la fois
+        verifier(IACombat.coupsRecus(List.of(10L, 50L, 100L), 110, 60) == 2 && IACombat.coupsRecus(List.of(), 110, 60) == 0, "coups reçus en 3 s");
+        long[] ry = IACombat.rythmeApres(null, 100, goutte, cm.ia().cadence(), cm.ia().repit());
+        verifier(ry[0] == 124 && ry[1] == 0, "après une Goutte : le groupe attend 24 tics, pas de répit des attaques lourdes");
+        ry = IACombat.rythmeApres(ry, 130, salve, cm.ia().cadence(), cm.ia().repit());
+        verifier(ry[0] == 154 && ry[1] == 130 + 27 + 80, "après une Salve : 80 tics de répit après sa fin avant une autre attaque lourde");
+        verifier(cm.ia().recul() == 0.85 && cm.ia().souffle() == 40, "recul plus lent que la marche, essoufflé après 40 tics");
+        verifier(cm.coupDeBase() != null && cm.coupDeBase().forme() == Competence.Forme.CONTACT && cm.coupDeBase().signal() == 8
+            && !cm.coupDeBase().magique() && cm.coupDeBase().type().equals("Impact") && cm.coupDeBase().animation() == null
+            && cm.coupDeBase().effets().marque() == null && !cm.nomVisible(), "coup de base au contact, signal 8 ; pas de nom affiché");
+        verifier(cm.ia().distance() && cm.ia().distMin() == 5 && cm.ia().distMax() == 11 && cm.ia().aggro() == 14 && cm.ia().laisse() == 28, "IA à distance 5-11");
+        verifier(cm.butin().size() == 2 && cm.butin().get(0).objet().equals("vorace:cristal_bleu_nuit") && cm.butin().get(0).min() == 1
+            && cm.butin().get(0).max() == 2 && cm.butin().get(1).chance() == 0.25 && cm.xp() == 40, "butin et XP lus");
+        verifier(Math.abs(cm.stat("puissance_mag", 12) - 66 * 1.18) < 1e-9 && Math.abs(cm.vieAuNiveau(12) - 429) < 1e-9 && cm.stat("esquive", 12) == 0.02
+            && Math.abs(cm.stat("resistance", 7) - 12 * 0.9) < 1e-9 && cm.stat("puissance_mag", 9) == 66 && Math.abs(cm.xpAuNiveau(11) - 48) < 1e-9,
+            "niveau 12 : Vie 429, Puissance ×1,18 ; esquive inchangée");
+        CoupMob cg = CoupMob.de(cm, 12, goutte, 1.5);
+        verifier(Math.abs(cg.puissance() - 66 * 1.18) < 1e-9 && cg.multiplicateur() == 1.5 && "Brulure".equals(cg.alteration()) && cg.duree() == 3
+            && cg.nom().equals("Goutte ardente"), "coup d'une attaque au niveau du mob");
+        pb.clear();
+        DefinitionMob grande = DefinitionMob.lire("cr_grande_meche", yc.getConfigurationSection("cr_grande_meche"), pb);
+        pb.forEach(x -> System.out.println("  problème : " + x));
+        verifier(pb.isEmpty() && grande.combat().rang() == Combat.Rang.ELITE_PP && grande.combat().enrage() == 300 && grande.combat().phases().size() == 2
+            && grande.combat().phases().get(0).seuil() == 0.6 && "cr_meche_sourde".equals(grande.combat().phases().get(0).invocation())
+            && grande.combat().phases().get(0).nombre() == 2 && grande.combat().phases().get(1).vitesse() == 1.25
+            && grande.combat().competence("cierge_abattu").forme() == Competence.Forme.LIGNE && grande.combat().competence("cierge_abattu").phase() == 1
+            && "loin".equals(grande.combat().competence("pluie_de_suif").fixation()), "Grande Mèche : élite ++, phases, fixation, ligne");
+        java.util.Map<java.util.UUID, Double> dg = new java.util.HashMap<>();
+        java.util.UUID ja = java.util.UUID.randomUUID(), jb = java.util.UUID.randomUUID(), jc = java.util.UUID.randomUUID();
+        dg.put(ja, 120.0); dg.put(jb, 100.0); dg.put(jc, 110.0);
+        verifier(ja.equals(Butin.gagnant(dg)) && Butin.gagnant(java.util.Map.of()) == null, "butin : personne à 50,01 % → celui qui a fait le plus");
+        float[][] mo = Combats.morceaux(165, 198, 330);
+        verifier(Math.abs(mo[0][1] - Combats.INT_L * 0.5f) < 1e-5 && Math.abs(mo[1][1] - Combats.INT_L * 0.1f) < 1e-5 && Math.abs(mo[2][1] - Combats.INT_L * 0.4f) < 1e-5
+            && Math.abs(mo[0][0] + Combats.INT_L * 0.25f) < 1e-5 && Math.abs(mo[2][0] - Combats.INT_L * 0.3f) < 1e-5
+            && Math.abs(mo[0][1] + mo[1][1] + mo[2][1] - Combats.INT_L) < 1e-5, "barre : Vie, traîne et vide côte à côte, sans recouvrement");
+        verifier(Combats.morceaux(1, 1, 330)[0][1] > 0.02f && Combats.morceaux(0, 0, 330)[0][1] == 0, "barre : toujours un peu de rouge tant qu'il vit");
+        String barreDeBoss = IACombat.barreBoss(1600, 2000, 3200, Combat.Rang.ELITE_PP);
+        verifier(barreDeBoss.contains("<glyphe:vmob_boss_cadre_elite_pp_g><decalage:-1><glyphe:vmob_boss_cadre_elite_pp_d>")
+            && barreDeBoss.contains("<glyphe:vmob_boss_vie_g_44><decalage:-1><glyphe:vmob_boss_vie_d_00>")
+            && barreDeBoss.contains("<glyphe:vmob_boss_traine_g_44><decalage:-1><glyphe:vmob_boss_traine_d_11>")
+            && barreDeBoss.split("decalage:-193", -1).length == 3, "barre de boss : cadre, traîne, Vie en deux moitiés");
+        verifier(IACombat.barreBoss(1, 1, 3200, Combat.Rang.BOSS).contains("vmob_boss_vie_g_01") && IACombat.barreBoss(3200, 3200, 3200, Combat.Rang.BOSS).contains("vmob_boss_vie_d_44"),
+            "barre de boss : pleine, et un palier au moins tant qu'il vit");
+        verifier(IACombat.dureeMarque(9) == 8 && IACombat.dureeMarque(18) == 18 && IACombat.dureeMarque(47) == 44 && IACombat.dureeMarque(3) == 4
+            && IACombat.dureeFlaque(50) == 50 && IACombat.dureeFlaque(70) == 60 && IACombat.dureeFlaque(500) == 200, "durées des animations de marque et de flaque");
+        verifier(Largeur.de("Grande Mèche Nv.10") == 100, "largeur d'un nom");
+        // les effets et les images installés dans Vorace existent bien dans le jar
+        String inst;
+        try (InputStream in = TestMobs.class.getClassLoader().getResourceAsStream("installation.txt")) {
+            inst = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        }
+        int absents = 0, lignes = 0;
+        for (String ligne : inst.split("\n")) {
+            String[] x = ligne.trim().split(" ");
+            if (x.length != 2) continue;
+            lignes++;
+            if (TestMobs.class.getClassLoader().getResource(x[0]) == null) { absents++; System.out.println("  absent : " + x[0]); }
+        }
+        verifier(lignes > 190 && absents == 0 && inst.contains("modeles-animes/fx_cire_goutte.bbmodel") && inst.contains("objets/vorace-mob-barre.yml"),
+            "installation.txt : " + lignes + " fichiers, tous dans le jar");
+
         System.out.println(echecs == 0 ? "TOUS LES TESTS PASSENT" : echecs + " ECHEC(S)");
         System.exit(echecs == 0 ? 0 : 1);
     }

@@ -26,16 +26,19 @@ import java.util.Map;
  * @param altMin     hauteur de vol minimale au-dessus du sol (volants)
  * @param altMax     hauteur de vol maximale
  * @param marche     volants : vitesse de marche au sol (blocs/s) quand il est posé ; 0 = il reste sur place
+ * @param combat     bloc {@code combat:} (niveau, Vie, rang, stats) ; null = mob sans combat (Vie du jeu)
  */
 public record DefinitionMob(String id, String nom, String type, List<String> modeles, double tailleMin, double tailleMax,
                             double vie, double vitesse, double degats, Cerveau.Caractere caractere, String ia, double laisse,
                             String zone, Cerveau.Activite activite, double cohesion, double detection, List<String> nourriture,
                             boolean boit, boolean silencieux, Map<String, String> animations, List<String> ennui, double envol,
-                            String vol, double altMin, double altMax, double marche) {
+                            String vol, double altMin, double altMax, double marche, Combat combat) {
 
     public boolean decor() { return type.equals("decor"); }
     public boolean cerveau() { return ia.equals("vorace") && !decor() && vol == null; }
     public boolean volant() { return vol != null && !decor(); }
+    /** Mob de combat : sa Vie, son niveau et ses stats sont gérés par vorace-mob. */
+    public boolean combattant() { return combat != null && !decor(); }
 
     /** Animation du modèle pour un rôle (« manger »...), ou null. */
     public String animation(String role) { return animations.get(role); }
@@ -93,7 +96,8 @@ public record DefinitionMob(String id, String nom, String type, List<String> mod
             s.getDouble("vie", 0), Math.max(0.05, s.getDouble("vitesse", 1)), s.getDouble("degats", 2), car, ia,
             Math.max(2, s.getDouble("laisse", 24)), s.getString("zone"), act, Math.max(0, cohesion), Math.max(1, s.getDouble("detection", 10)),
             List.copyOf(nourriture), s.getBoolean("boit", true), s.getBoolean("silencieux", false), Map.copyOf(anims), List.copyOf(ennui),
-            Math.max(0, s.getDouble("envol", 0)), volLu(id, s, problemes), alt(s, 0), alt(s, 1), Math.max(0, s.getDouble("marche", 0)));
+            Math.max(0, s.getDouble("envol", 0)), volLu(id, s, problemes), alt(s, 0), alt(s, 1), Math.max(0, s.getDouble("marche", 0)),
+            Combat.lire(id, s.getConfigurationSection("combat"), problemes));
     }
 
     private static String volLu(String id, ConfigurationSection s, List<String> problemes) {

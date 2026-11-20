@@ -32,6 +32,46 @@ public final class VoraceMob extends JavaPlugin {
     /** Les mobs, ou null s'ils n'ont pas pu démarrer. */
     public Mobs mobs() { return mobs; }
 
+    /**
+     * Avant que Vorace ne démarre : installe (ou met à jour) dans plugins/Vorace ce que vorace-mob affiche : les objets de
+     * la barre de vie des mobs, les glyphes de la barre de boss et les modèles d'effets des attaques d'exemple
+     * (« fx_cire_... »). La liste est dans installation.txt (ressource → fichier dans plugins/Vorace). Les anciennes images
+     * de vorace-mob qui ne servent plus sont retirées.
+     */
+    @Override
+    public void onLoad() {
+        Path vorace = getDataFolder().toPath().getParent().resolve("Vorace");
+        try (java.io.InputStream in = getClass().getClassLoader().getResourceAsStream("installation.txt")) {
+            if (in == null) throw new IOException("installation.txt absent");
+            java.util.Set<Path> gardes = new java.util.HashSet<>();
+            for (String ligne : new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8).split("\n")) {
+                String[] x = ligne.trim().split(" ");
+                if (x.length != 2) continue;
+                Path cible = vorace.resolve(x[1]);
+                copier(x[0], cible);
+                gardes.add(cible);
+            }
+            Path images = vorace.resolve("ressources").resolve("textures").resolve("vorace-mob");
+            if (Files.isDirectory(images)) {
+                try (java.util.stream.Stream<Path> f = Files.walk(images)) {
+                    for (Path x : f.filter(Files::isRegularFile).filter(x -> !gardes.contains(x)).toList()) Files.deleteIfExists(x);
+                }
+            }
+        } catch (IOException | RuntimeException e) {
+            getLogger().warning("Barres et effets de vorace-mob non installés dans Vorace : " + e.getMessage());
+        }
+    }
+
+    private void copier(String ressource, Path cible) throws IOException {
+        try (java.io.InputStream in = getClass().getClassLoader().getResourceAsStream(ressource)) {
+            if (in == null) throw new IOException("ressource absente : " + ressource);
+            byte[] contenu = in.readAllBytes();
+            if (Files.isRegularFile(cible) && java.util.Arrays.equals(Files.readAllBytes(cible), contenu)) return;
+            Files.createDirectories(cible.getParent());
+            Files.write(cible, contenu);
+        }
+    }
+
     @Override
     public void onEnable() {
         if (!(Bukkit.getPluginManager().getPlugin("Vorace") instanceof Vorace v) || !v.isEnabled()) {

@@ -1,0 +1,236 @@
+# Mobs de combat : un bloc « combat: » donne au mob une Vie (gardée par vorace-mob), un niveau, un rang, des stats, un
+# cerveau de combat (aggro et menace, déplacements, attaques annoncées), un butin et, pour les élites ++ et les boss, des
+# phases et une barre de boss. Le plugin du combat du serveur lit les stats (formule de dégâts, esquive...) ; sans lui,
+# 1 point de dégât du jeu retire 1 % de la Vie et les coups des mobs font Puissance × multiplicateur / 20.
+# Au-dessus du mob, en combat : sa barre de vie seulement (« nom-visible: true » pour le nom et le niveau).
+# Modèle : plugins/Vorace/modeles-animes/cr_meche_sourde.bbmodel (sans modèle, il garde l'apparence du jeu).
+# Effets des attaques : modèles « fx_cire_... » installés par vorace-mob dans plugins/Vorace/modeles-animes (pour les
+# changer, copie-les sous un autre nom : ceux-là sont remis à jour à chaque démarrage).
+# Animations de combat reconnues (si le modèle les a) : idle_combat, walk_combat, run, walk_back, strafe_left,
+# strafe_right, flee, alert, get_up ; à renommer dans « animations: » (garde, marche-combat, course, recul, gauche,
+# droite, fuite, alerte, releve).
+
+cr_meche_sourde:
+  nom: "Mèche-sourde"
+  type: husk                    # porteur sans armure et qui ne brûle pas au soleil
+  modele: cr_meche_sourde
+  caractere: agressif
+  activite: toujours
+  laisse: 24
+  detection: 14
+  boit: false
+  silencieux: true
+  combat:
+    niveau: 9                   # ou [8, 10] : tiré à l'apparition (/vmob invoquer <mob> [nombre] [niveau] pour l'imposer)
+    vie: 330
+    rang: normal                # normal, elite, elite++, mini-boss, boss
+    type: Fire                  # type de ses attaques (par défaut)
+    magique: true               # ses attaques utilisent sa Puissance magique
+    xp: 40                      # XP au niveau de base (le plugin du combat applique l'écart de niveau)
+    # progression par niveau d'écart avec le niveau de base (ici 9) : +10 % de Vie, +6 % de Puissance, +5 % de défense
+    progression: { vie: 0.10, puissance: 0.06, defense: 0.05, xp: 0.10 }
+    stats:
+      resistance: 12            # Résistance physique
+      armure: 3                 # Armure physique (+1 Résistance physique par point)
+      res_mag: 0                # Résistance magique
+      puissance_phys: 75
+      puissance_mag: 66
+      vitesse: 0.2
+      crit: 0.03
+      esquive: 0.02
+    ia:
+      role: distance            # contact (va au corps à corps) ou distance (garde ses distances)
+      aggro: 14                 # le premier joueur vu à 14 blocs devient sa cible
+      laisse: 28                # trop loin de son point de départ : il abandonne, rentre et récupère sa Vie
+      distance: [5, 11]         # il recule sous 5 blocs, se rapproche au-delà de 11, tourne autour entre les deux
+      entraide: 8               # les Mèches-sourdes à 8 blocs le rejoignent
+      vitesse: 1.0              # multiplicateur de ses déplacements en combat
+      # Réglages de difficulté (ce sont les valeurs par défaut) :
+      recul: 0.85               # vitesse quand il recule (× sa vitesse) : plus bas, on le rattrape plus vite
+      souffle: 40               # après 40 tics de recul il est essoufflé : il tient sa place 60 tics, on peut le frapper
+      cadence: 24               # à plusieurs sur un joueur : 24 tics au moins entre deux attaques du groupe sur lui
+      repit: 80                 # à plusieurs : 80 tics entre deux attaques lourdes (salve, pluie, éclaboussure) sur lui
+    coup-de-base:               # coup de chandelier quand on le colle (animation « attack », le coup tombe au tic 8)
+      portee: 2.5
+      type: Impact
+      magique: false
+      multiplicateur: 0.8
+      signal: 8
+      recuperation: 6
+      recharge: 26
+    competences:
+      goutte_ardente:           # son tir courant : rapide, il vise un peu en avant de toi
+        nom: "Goutte ardente"
+        animation: atk_goutte_rapide
+        forme: projectile       # en cloche ; touche de plein fouet un joueur sur sa route, sinon éclate au sol
+        portee: [3.5, 16]
+        rayon: 1.5
+        multiplicateur: 1.0
+        signal: 8
+        actif: 1
+        recuperation: 5
+        recharge: 40
+        vitesse: 1.1            # blocs par tic
+        anticipation: 0.6       # 0 = où tu es ; 1 = où tu seras si tu continues tout droit
+        alteration: Brulure
+        duree: 3
+        depart: g_flame_r
+        poids: 2
+        effets: { marque: fx_cire_marque, projectile: fx_cire_goutte, impact: fx_cire_impact }
+      salve_ardente:            # trois gouttes : une où tu vas, une plus loin, une sur toi ; chacune laisse une flaque
+        nom: "Salve ardente"
+        animation: atk_salve
+        forme: projectile
+        portee: [5, 16]
+        rayon: 1.5
+        multiplicateur: 0.8
+        signal: 8
+        salve: 3
+        intervalle: 5
+        recuperation: 8
+        recharge: 160
+        vitesse: 1.1
+        anticipation: 0.6
+        flaque: 40              # flaque brûlante de 2 s : un coup à 25 % toutes les 10 tics à qui reste dedans
+        flaque-multiplicateur: 0.25
+        alteration: Brulure
+        duree: 3
+        depart: [g_flame_r, g_flame_l, g_flame_c]
+        effets: { marque: fx_cire_marque, projectile: fx_cire_goutte, impact: fx_cire_impact, flaque: fx_cire_flaque }
+      pluie_de_suif:            # deux cercles : sur toi et sur ta route ; ils se remplissent puis la cire tombe
+        nom: "Pluie de suif"
+        animation: atk_pluie_rapide
+        forme: zone
+        portee: [3, 10]
+        rayon: 2.6
+        zones: 2
+        dispersion: 4
+        multiplicateur: 0.9
+        signal: 18
+        actif: 4
+        recuperation: 21
+        recharge: 240
+        flaque: 40
+        alteration: Ralentissement
+        duree: 3
+        effets: { marque: fx_cire_marque, pluie: fx_cire_pluie, flaque: fx_cire_flaque }
+      eclaboussure:             # frappé de près : il fait gicler la cire autour de lui, te repousse et bondit en arrière
+        nom: "Éclaboussure"
+        animation: atk_eclaboussure
+        forme: cercle
+        rayon: 2.6
+        portee: 2.6             # se déclenche quand sa cible est à 2,6 blocs ou moins
+        presse: 2               # seulement après 2 coups reçus en 3 s : tu as le temps de le frapper
+        multiplicateur: 0.9
+        signal: 12              # 0,6 s pour sortir du cercle
+        actif: 1
+        recuperation: 8
+        recharge: 200
+        repousse: 0.8
+        bond: -4                # bond de 4 blocs en arrière après le coup
+        alteration: Brulure
+        duree: 2
+        effets: { marque: fx_cire_marque, impact: fx_cire_impact }
+    butin:
+      - { objet: "vorace:cristal_bleu_nuit", chance: 1.0, nombre: [1, 2] }   # cristaux de Babel (installés par matsuri-coeur)
+      - { objet: "minecraft:honeycomb", chance: 0.25, nombre: 1 }            # un peu de cire
+
+# Essai d'élite ++ (barre de boss, phases, attaques annoncées, enrage) avec le même modèle, plus grand.
+cr_grande_meche:
+  nom: "Grande Mèche"
+  type: husk
+  modele: cr_meche_sourde
+  taille: 1.6
+  caractere: agressif
+  activite: toujours
+  laisse: 30
+  detection: 16
+  boit: false
+  silencieux: true
+  combat:
+    niveau: 10
+    vie: 3200
+    rang: elite++
+    type: Fire
+    magique: true
+    xp: 400
+    enrage: 300                 # au bout de 5 min de combat : dégâts × 1,5 et plus rapide
+    stats: { resistance: 30, armure: 10, res_mag: 20, puissance_phys: 120, puissance_mag: 110, crit: 0.05, esquive: 0 }
+    ia: { role: distance, aggro: 16, laisse: 32, distance: [5, 10], entraide: 0, vitesse: 1.0 }
+    coup-de-base: { portee: 3.2, type: Impact, magique: false, multiplicateur: 1.2, signal: 8, recuperation: 8, recharge: 28 }
+    competences:
+      salve_ardente:
+        nom: "Salve ardente"
+        animation: atk_salve
+        forme: projectile
+        portee: [4, 18]
+        rayon: 2
+        multiplicateur: 0.9
+        signal: 8
+        salve: 3
+        intervalle: 5
+        recuperation: 8
+        recharge: 60
+        vitesse: 1.15
+        anticipation: 0.85
+        flaque: 60
+        alteration: Brulure
+        duree: 4
+        depart: [g_flame_r, g_flame_l, g_flame_c]
+        poids: 2
+        effets: { marque: fx_cire_marque, projectile: fx_cire_goutte, impact: fx_cire_impact, flaque: fx_cire_flaque }
+      pluie_de_suif:
+        nom: "Pluie de suif"
+        animation: atk_pluie_rapide
+        forme: zone
+        portee: [0, 14]
+        rayon: 3.2
+        zones: 4
+        dispersion: 5
+        multiplicateur: 1.1
+        signal: 18
+        actif: 4
+        recuperation: 21
+        recharge: 180
+        flaque: 80
+        alteration: Ralentissement
+        duree: 3
+        fixation: loin          # il vise le joueur le plus loin (marqué au-dessus de sa tête)
+        annonce: "<gold>La Grande Mèche lève ses chandeliers..."
+        effets: { marque: fx_cire_marque, pluie: fx_cire_pluie, flaque: fx_cire_flaque }
+      eclaboussure:
+        nom: "Éclaboussure"
+        animation: atk_eclaboussure
+        forme: cercle
+        rayon: 4.5
+        portee: 3.6
+        multiplicateur: 1.0
+        signal: 12
+        recuperation: 8
+        recharge: 120
+        repousse: 1.6
+        bond: -5
+        alteration: Brulure
+        duree: 3
+        effets: { marque: fx_cire_marque, impact: fx_cire_impact }
+      cierge_abattu:
+        nom: "Cierge abattu"
+        animation: attack
+        forme: ligne
+        portee: [0, 8]
+        rayon: 8                # longueur
+        largeur: 2
+        type: Impact
+        magique: false
+        multiplicateur: 1.4
+        signal: 16
+        actif: 2
+        recuperation: 14
+        recharge: 160
+        phase: 1                # seulement à partir de la 2e phase
+        effets: { marque: fx_cire_dalle }
+    phases:
+      - { seuil: 0.6, nom: "Fêlure", annonce: "<red>La cire se fend ! Des Mèches-sourdes accourent.", invocation: { mob: cr_meche_sourde, nombre: 2 } }
+      - { seuil: 0.25, nom: "Fonte", annonce: "<dark_red>La Grande Mèche fond et s'emballe !", vitesse: 1.25 }
+    butin:
+      - { objet: "vorace:cristal_bleu_nuit", chance: 1.0, nombre: [4, 6] }

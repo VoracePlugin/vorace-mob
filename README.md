@@ -55,6 +55,9 @@ mouton:
   approche (deux fois plus loin s'il court, deux fois moins s'il est accroupi) ; s'il a aussi une animation `retour`,
   il reste en place (les oiseaux sont partis) et la joue 15 s après le départ du dernier joueur proche, sinon il
   disparaît et son point d'apparition le remplace plus tard.
+- **Mobs de combat** (bloc `combat:`, exemple dans `mobs/combat.yml`) : Vie gardée par vorace-mob, niveau, rang
+  (normal, elite, elite++, mini-boss, boss), stats libres pour le plugin du combat ; nom, niveau et barre de vie
+  au-dessus du mob pendant le combat.
 - **Joueurs en créatif** : ils comptent comme les autres pour faire vivre les mobs et les effrayer (oiseaux,
   lapins...), mais ne sont jamais attaqués. Seuls les spectateurs et les joueurs invisibles sont ignorés.
 - **IA** : `ia: vorace` (le cerveau remplace l'IA de déplacement du jeu), `ia: jeu` (l'IA du jeu, gardée en laisse :
@@ -64,7 +67,7 @@ mouton:
 - `/vmob [liste|invoquer <mob> [nombre]|info [début du nom|*] [joueur]|apparitions|retirer [rayon]|recharger]` ; `info` donne pour
   chaque mob son action, ses besoins, sa distance à la maison et la distance parcourue depuis son apparition (depuis la console,
   le nom d'un joueur relève les mobs autour de lui).
-- API : `fr.vorace.mobs.VoraceMobAPI` (`invoquerMob`, `mobVorace`, `actionMob`, `effrayerMob`) ; événement
+- API : `fr.vorace.mobs.VoraceMobAPI` (`invoquerMob`, `mobVorace`, `actionMob`, `effrayerMob` ; combat : `stat`, `vie`, `infliger`, `coupEnCours`...) ; événement
   `fr.vorace.mobs.VoraceMobActionEvent` à chaque changement d'action.
 
 ## Installation
@@ -80,7 +83,7 @@ repris tels quels. Remplace seulement `/vorace mob ...` par `/vmob ...` dans tes
 | Commande | Rôle |
 |---|---|
 | `/vmob` | liste des mobs, zones et points d'apparition |
-| `/vmob invoquer <mob> [nombre]` | fait apparaître des mobs (en troupeau s'ils en ont un) |
+| `/vmob invoquer <mob> [nombre] [niveau]` | fait apparaître des mobs (en troupeau s'ils en ont un ; niveau imposé pour un mob de combat) |
 | `/vmob info [début du nom\|*] [joueur]` | état des mobs proches : action, besoins, position, distance parcourue, animation |
 | `/vmob apparitions` | points d'apparition et population |
 | `/vmob retirer [rayon]` | retire le mob le plus proche |

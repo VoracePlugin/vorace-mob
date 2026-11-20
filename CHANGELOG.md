@@ -1,5 +1,102 @@
 # Journal des changements
 
+## 1.5.1 (novembre 2026) : équilibre des groupes
+
+Retour de l'essai de la 1.5.0 : un groupe de trois Mèches-sourdes ne se laissait plus approcher.
+- **Chacun son tour** : à plusieurs sur le même joueur (rangs normal et élite), `ia.cadence` tics au moins entre deux
+  attaques du groupe sur lui (24 par défaut, le coup de base n'est pas compté) et `ia.repit` tics entre deux attaques
+  lourdes (80 par défaut ; `lourde:` d'une attaque, par défaut les salves, plusieurs zones, flaques, repousse et bond).
+- **Il se dégage seulement s'il est frappé** : `presse: 2` (par défaut pour un bond en arrière) : l'attaque n'est
+  possible qu'après 2 coups reçus en 3 s.
+- **Recul** : `ia.recul` (0,85 par défaut) et `ia.souffle` (40 tics) : après 2 s de recul il est essoufflé et tient sa
+  place 3 s.
+- **Mode spectateur** (joueur à terre, caméra d'un ultime) : le mob invisible qui porte un modèle n'apparaît plus en
+  transparence ; il est caché à ce joueur le temps du mode spectateur, avec sa barre de vie (le modèle reste visible).
+- Exemple `mobs/combat.yml` adouci (l'ancien est gardé en `combat.yml.ancien`) : Goutte ardente moins fréquente et qui
+  anticipe moins, Pluie de suif à deux cercles, flaques plus courtes, Éclaboussure plus lente, moins forte et plus rare.
+
+## 1.5.0 (novembre 2026) : retours de l'essai du cerveau de combat
+
+- **Plus de nom au-dessus des mobs**, seulement leur barre de vie, en combat (`combat.nom-visible: true` pour le nom et
+  le niveau). Le nom reste sur la barre de boss des élites ++ et des boss.
+- **Barre de vie refaite** : quatre affichages d'objets tournés vers le joueur (cadre sombre, or, violet ou rouge selon le
+  rang, Vie, traîne des derniers dégâts, vide), toujours éclairés, qui chevauchent le mob. La Vie et la traîne glissent.
+  Plus de fond gris ni de texte : la barre ne se perd plus derrière les flammes d'un modèle.
+- **Vraie barre de boss** : barre dessinée (cadre du rang, Vie, traîne) par-dessus celle du jeu, nom et niveau centrés
+  au-dessus.
+- **Effets des attaques en modèles animés** (`effets:` d'une attaque : `marque`, `projectile`, `impact`, `pluie`,
+  `flaque`) à la place des particules ; les modèles d'exemple `fx_cire_marque`, `fx_cire_dalle`, `fx_cire_goutte`,
+  `fx_cire_impact`, `fx_cire_pluie`, `fx_cire_flaque` sont installés dans `plugins/Vorace/modeles-animes`.
+- **Attaques plus dures** :
+  - projectiles : `vitesse` (blocs par tic), `anticipation` (il vise où la cible sera), touche de plein fouet un joueur
+    sur sa route, `salve` et `intervalle` (2e tir plus loin sur la route, 3e sur la cible), `depart` en liste ;
+  - zones : `zones` et `dispersion` (plusieurs cercles : sur la cible, sur sa route, autour) ;
+  - `flaque` : l'impact laisse une flaque brûlante (un coup à `flaque-multiplicateur` toutes les 10 tics) ;
+  - `repousse` (les joueurs touchés sont repoussés) et `bond` (le mob bondit après son coup, en arrière si négatif) ; une
+    attaque à `bond` négatif passe avant les autres : collé, il se dégage ;
+  - déplacements en combat plus vifs (recul et pas chassés).
+- Exemple `mobs/combat.yml` refait (l'ancien est gardé en `combat.yml.ancien`) : Goutte ardente rapide, Salve ardente,
+  Pluie de suif à trois cercles, Éclaboussure avec bond en arrière.
+- Un mob invoqué à un niveau au-dessus de son niveau de base apparaît avec toute sa Vie.
+
+## 1.4.0 (novembre 2026) : cerveau de combat
+
+Retours de l'essai de la 1.3.0 :
+- **Barre de vie dessinée** (glyphes installés dans Vorace au démarrage) : fond sombre, Vie rouge en dégradé avec crans
+  de 10 %, **traîne claire** des derniers dégâts qui rattrape la Vie, cadre selon le rang (fer, or, violet, rouge à
+  pointes) ; fond gris de l'étiquette retiré. Plus de « Vorace » devant le nom.
+- Le coup de base tombe **quand l'animation frappe** (signal de 9 tics) au lieu de lancer l'animation au moment du coup.
+- Le **niveau compte** : progression par niveau d'écart avec le niveau de base (`progression:`, par défaut +10 % de
+  Vie, +6 % de Puissance, +5 % de défense, +10 % d'XP par niveau).
+
+Cerveau de combat (bloc `combat.ia`, `combat.competences`, `combat.coup-de-base`) :
+- **Menace** : premier joueur vu (distance d'aggro, en vue) à 10, 1 par dégât, le plus proche × 1,1, changement de
+  cible à 110 % (cible à 5 blocs ou moins) ou 130 %, hors de vue plus de 5 s : −10 %/s, 8 mobs au plus par joueur (le
+  plus ancien oublie), mort, départ ou changement de monde : oublié ; les mobs du même type autour le rejoignent
+  (`entraide`). Trop loin de chez lui ou plus personne : il **rentre** en courant et récupère sa Vie.
+- **Déplacements** : rôle `contact` (va au corps à corps) ou `distance` (garde sa bande de distance : recule face à la
+  cible, se rapproche par le chemin, **tourne autour en pas chassés** avec des pauses, s'écarte des alliés, saute les
+  marches, ne se jette pas dans un trou). Regarde toujours sa cible. Petit sursaut d'alerte quand il te repère.
+- **Attaques annoncées** : signal (animation, zone marquée au sol qui se remplit), actif, récupération, recharge ;
+  formes contact, projectile en cloche (impact marqué pendant le vol, bloqué par les murs), zone posée sur la cible,
+  cercle autour de lui, cône, ligne ; os de départ du projectile ; altération du coup ; poids ; seulement sous X % de Vie
+  ou à partir d'une phase.
+- **Contrôles** (API, pour le plugin du combat) : `entraver` (étourdi, enraciné : une attaque en train d'être annoncée
+  est interrompue), `provoquer`, `aveugler`, `fuir` ; réactions aux compétences de vorace-core (saisi, plaqué,
+  soulevé, projeté) subies, puis `get_up` pour se relever.
+- **Élites ++ et boss** : barre de boss (élite ++ violette, mini-boss et boss rouges), phases à des seuils de Vie
+  (annonce, animation, vitesse, invocations), attaques annoncées en sous-titre, **Fixation** (`fixation: hasard`,
+  `loin`, `proche` : cible choisie par le script, marquée au-dessus de sa tête), **enrage** (`enrage: 300` : dégâts ×
+  1,5 et plus rapide).
+- **Butin** (`combat.butin`) : objets du jeu ou de Vorace (`vorace:<id>`), chance, nombre ; à 50,01 % des dégâts, sinon
+  au joueur qui en a fait le plus ; objets réservés au gagnant ; événement `VoraceMobMortEvent` (dégâts, gagnant, XP,
+  objets) pour le plugin du combat ; XP du jeu sinon.
+- Animations de combat reconnues : `idle_combat`, `walk_combat`, `run`, `walk_back`, `strafe_left`, `strafe_right`,
+  `flee`, `alert`, `get_up` (renommables dans `animations:`).
+- Commandes : `/vmob menace [rayon]` (cible, mode, attaque, table de menace du mob le plus proche), `/vmob butin <mob>`,
+  `/vmob point <mob> [nombre] [rayon] [réapparition]` (point d'apparition à ta position, `apparitions/points.yml`),
+  `/vmob point retirer <id>`. API : `nom`, `enCombat`, `cible`, `ajouterMenace`, `menaceDeSoin`, `entraver`,
+  `provoquer`, `aveugler`, `fuir`, `infliger(entité, montant, source)`.
+- Exemple `mobs/combat.yml` : la Mèche-sourde complète (Goutte ardente, Pluie de suif, coup de chandelier, cristaux) et
+  la Grande Mèche, essai d'élite ++ (phases, invocations, Fixation, Cierge abattu, enrage). L'exemple de la 1.3.0 est
+  remplacé s'il n'a pas été modifié.
+
+## 1.3.0 (novembre 2026) : mobs de combat
+
+Un bloc `combat:` fait d'un mob un **mob de combat** (voir `mobs/combat.yml`, installé au démarrage) :
+
+- **Vie** gardée par vorace-mob (elle peut dépasser les 1 024 de santé du jeu) ; la santé du jeu suit la même proportion
+  sur 100 pour la mort et le tueur. Le jeu ne le soigne pas tout seul ; son armure du jeu est à 0.
+- **Niveau** fixe ou tiré dans une fourchette (`niveau: [8, 10]`), **rang** (normal, elite, elite++, mini-boss, boss) et
+  **stats libres** (`stats:`), lues par le plugin du combat du serveur.
+- **Nom, niveau et barre de vie** au-dessus du mob, au point `tag_` de son modèle : nom coloré selon le rang, barre
+  (verte, jaune, rouge) et Vie visibles pendant le combat et 10 s après. Le nom du jeu au survol est caché.
+- Dégâts qui ne passent pas par le plugin du combat (feu, chute, serveur sans plugin de combat) : 1 point du jeu = 1 %
+  de la Vie. Rien du jeu ne tombe à sa mort (le butin viendra des tables de butin).
+- API : `estCombattant`, `niveau`, `rang`, `stat`, `stats`, `vie`, `vieMax`, `infliger`, `soigner`, `coupEnCours`
+  (record `CoupMob` : Puissance, physique ou magique, type, multiplicateur, altération) pendant le coup du mob.
+- `/vmob invoquer <mob> [nombre] [niveau]` (niveau imposé, auto-complété), `/vmob info` montre niveau, Vie et rang.
+
 ## 1.2.0 (novembre 2026) : Paper 1.21.4 au minimum
 
 VoraceMob demande maintenant un serveur **Paper 1.21.4 ou plus récent** (`api-version: '1.21.4'`), comme

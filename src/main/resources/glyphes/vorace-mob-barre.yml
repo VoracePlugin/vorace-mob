@@ -1,0 +1,1130 @@
+# Glyphes de la barre de boss des mobs de combat (installés et mis à jour par vorace-mob à chaque démarrage).
+
+vmob_boss_cadre_normal_g:
+  texture: vorace-mob/boss/cadre_normal_g
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_cadre_normal_d:
+  texture: vorace-mob/boss/cadre_normal_d
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_cadre_elite_g:
+  texture: vorace-mob/boss/cadre_elite_g
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_cadre_elite_d:
+  texture: vorace-mob/boss/cadre_elite_d
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_cadre_elite_pp_g:
+  texture: vorace-mob/boss/cadre_elite_pp_g
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_cadre_elite_pp_d:
+  texture: vorace-mob/boss/cadre_elite_pp_d
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_cadre_boss_g:
+  texture: vorace-mob/boss/cadre_boss_g
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_cadre_boss_d:
+  texture: vorace-mob/boss/cadre_boss_d
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_g_00:
+  texture: vorace-mob/boss/vie_g_00
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_g_01:
+  texture: vorace-mob/boss/vie_g_01
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_g_02:
+  texture: vorace-mob/boss/vie_g_02
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_g_03:
+  texture: vorace-mob/boss/vie_g_03
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_g_04:
+  texture: vorace-mob/boss/vie_g_04
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_g_05:
+  texture: vorace-mob/boss/vie_g_05
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_g_06:
+  texture: vorace-mob/boss/vie_g_06
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_g_07:
+  texture: vorace-mob/boss/vie_g_07
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_g_08:
+  texture: vorace-mob/boss/vie_g_08
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_g_09:
+  texture: vorace-mob/boss/vie_g_09
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_g_10:
+  texture: vorace-mob/boss/vie_g_10
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_g_11:
+  texture: vorace-mob/boss/vie_g_11
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_g_12:
+  texture: vorace-mob/boss/vie_g_12
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_g_13:
+  texture: vorace-mob/boss/vie_g_13
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_g_14:
+  texture: vorace-mob/boss/vie_g_14
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_g_15:
+  texture: vorace-mob/boss/vie_g_15
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_g_16:
+  texture: vorace-mob/boss/vie_g_16
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_g_17:
+  texture: vorace-mob/boss/vie_g_17
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_g_18:
+  texture: vorace-mob/boss/vie_g_18
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_g_19:
+  texture: vorace-mob/boss/vie_g_19
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_g_20:
+  texture: vorace-mob/boss/vie_g_20
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_g_21:
+  texture: vorace-mob/boss/vie_g_21
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_g_22:
+  texture: vorace-mob/boss/vie_g_22
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_g_23:
+  texture: vorace-mob/boss/vie_g_23
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_g_24:
+  texture: vorace-mob/boss/vie_g_24
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_g_25:
+  texture: vorace-mob/boss/vie_g_25
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_g_26:
+  texture: vorace-mob/boss/vie_g_26
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_g_27:
+  texture: vorace-mob/boss/vie_g_27
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_g_28:
+  texture: vorace-mob/boss/vie_g_28
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_g_29:
+  texture: vorace-mob/boss/vie_g_29
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_g_30:
+  texture: vorace-mob/boss/vie_g_30
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_g_31:
+  texture: vorace-mob/boss/vie_g_31
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_g_32:
+  texture: vorace-mob/boss/vie_g_32
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_g_33:
+  texture: vorace-mob/boss/vie_g_33
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_g_34:
+  texture: vorace-mob/boss/vie_g_34
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_g_35:
+  texture: vorace-mob/boss/vie_g_35
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_g_36:
+  texture: vorace-mob/boss/vie_g_36
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_g_37:
+  texture: vorace-mob/boss/vie_g_37
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_g_38:
+  texture: vorace-mob/boss/vie_g_38
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_g_39:
+  texture: vorace-mob/boss/vie_g_39
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_g_40:
+  texture: vorace-mob/boss/vie_g_40
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_g_41:
+  texture: vorace-mob/boss/vie_g_41
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_g_42:
+  texture: vorace-mob/boss/vie_g_42
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_g_43:
+  texture: vorace-mob/boss/vie_g_43
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_g_44:
+  texture: vorace-mob/boss/vie_g_44
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_d_00:
+  texture: vorace-mob/boss/vie_d_00
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_d_01:
+  texture: vorace-mob/boss/vie_d_01
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_d_02:
+  texture: vorace-mob/boss/vie_d_02
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_d_03:
+  texture: vorace-mob/boss/vie_d_03
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_d_04:
+  texture: vorace-mob/boss/vie_d_04
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_d_05:
+  texture: vorace-mob/boss/vie_d_05
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_d_06:
+  texture: vorace-mob/boss/vie_d_06
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_d_07:
+  texture: vorace-mob/boss/vie_d_07
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_d_08:
+  texture: vorace-mob/boss/vie_d_08
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_d_09:
+  texture: vorace-mob/boss/vie_d_09
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_d_10:
+  texture: vorace-mob/boss/vie_d_10
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_d_11:
+  texture: vorace-mob/boss/vie_d_11
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_d_12:
+  texture: vorace-mob/boss/vie_d_12
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_d_13:
+  texture: vorace-mob/boss/vie_d_13
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_d_14:
+  texture: vorace-mob/boss/vie_d_14
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_d_15:
+  texture: vorace-mob/boss/vie_d_15
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_d_16:
+  texture: vorace-mob/boss/vie_d_16
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_d_17:
+  texture: vorace-mob/boss/vie_d_17
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_d_18:
+  texture: vorace-mob/boss/vie_d_18
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_d_19:
+  texture: vorace-mob/boss/vie_d_19
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_d_20:
+  texture: vorace-mob/boss/vie_d_20
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_d_21:
+  texture: vorace-mob/boss/vie_d_21
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_d_22:
+  texture: vorace-mob/boss/vie_d_22
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_d_23:
+  texture: vorace-mob/boss/vie_d_23
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_d_24:
+  texture: vorace-mob/boss/vie_d_24
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_d_25:
+  texture: vorace-mob/boss/vie_d_25
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_d_26:
+  texture: vorace-mob/boss/vie_d_26
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_d_27:
+  texture: vorace-mob/boss/vie_d_27
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_d_28:
+  texture: vorace-mob/boss/vie_d_28
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_d_29:
+  texture: vorace-mob/boss/vie_d_29
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_d_30:
+  texture: vorace-mob/boss/vie_d_30
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_d_31:
+  texture: vorace-mob/boss/vie_d_31
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_d_32:
+  texture: vorace-mob/boss/vie_d_32
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_d_33:
+  texture: vorace-mob/boss/vie_d_33
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_d_34:
+  texture: vorace-mob/boss/vie_d_34
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_d_35:
+  texture: vorace-mob/boss/vie_d_35
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_d_36:
+  texture: vorace-mob/boss/vie_d_36
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_d_37:
+  texture: vorace-mob/boss/vie_d_37
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_d_38:
+  texture: vorace-mob/boss/vie_d_38
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_d_39:
+  texture: vorace-mob/boss/vie_d_39
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_d_40:
+  texture: vorace-mob/boss/vie_d_40
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_d_41:
+  texture: vorace-mob/boss/vie_d_41
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_d_42:
+  texture: vorace-mob/boss/vie_d_42
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_d_43:
+  texture: vorace-mob/boss/vie_d_43
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_vie_d_44:
+  texture: vorace-mob/boss/vie_d_44
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_g_00:
+  texture: vorace-mob/boss/traine_g_00
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_g_01:
+  texture: vorace-mob/boss/traine_g_01
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_g_02:
+  texture: vorace-mob/boss/traine_g_02
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_g_03:
+  texture: vorace-mob/boss/traine_g_03
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_g_04:
+  texture: vorace-mob/boss/traine_g_04
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_g_05:
+  texture: vorace-mob/boss/traine_g_05
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_g_06:
+  texture: vorace-mob/boss/traine_g_06
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_g_07:
+  texture: vorace-mob/boss/traine_g_07
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_g_08:
+  texture: vorace-mob/boss/traine_g_08
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_g_09:
+  texture: vorace-mob/boss/traine_g_09
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_g_10:
+  texture: vorace-mob/boss/traine_g_10
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_g_11:
+  texture: vorace-mob/boss/traine_g_11
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_g_12:
+  texture: vorace-mob/boss/traine_g_12
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_g_13:
+  texture: vorace-mob/boss/traine_g_13
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_g_14:
+  texture: vorace-mob/boss/traine_g_14
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_g_15:
+  texture: vorace-mob/boss/traine_g_15
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_g_16:
+  texture: vorace-mob/boss/traine_g_16
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_g_17:
+  texture: vorace-mob/boss/traine_g_17
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_g_18:
+  texture: vorace-mob/boss/traine_g_18
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_g_19:
+  texture: vorace-mob/boss/traine_g_19
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_g_20:
+  texture: vorace-mob/boss/traine_g_20
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_g_21:
+  texture: vorace-mob/boss/traine_g_21
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_g_22:
+  texture: vorace-mob/boss/traine_g_22
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_g_23:
+  texture: vorace-mob/boss/traine_g_23
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_g_24:
+  texture: vorace-mob/boss/traine_g_24
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_g_25:
+  texture: vorace-mob/boss/traine_g_25
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_g_26:
+  texture: vorace-mob/boss/traine_g_26
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_g_27:
+  texture: vorace-mob/boss/traine_g_27
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_g_28:
+  texture: vorace-mob/boss/traine_g_28
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_g_29:
+  texture: vorace-mob/boss/traine_g_29
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_g_30:
+  texture: vorace-mob/boss/traine_g_30
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_g_31:
+  texture: vorace-mob/boss/traine_g_31
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_g_32:
+  texture: vorace-mob/boss/traine_g_32
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_g_33:
+  texture: vorace-mob/boss/traine_g_33
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_g_34:
+  texture: vorace-mob/boss/traine_g_34
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_g_35:
+  texture: vorace-mob/boss/traine_g_35
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_g_36:
+  texture: vorace-mob/boss/traine_g_36
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_g_37:
+  texture: vorace-mob/boss/traine_g_37
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_g_38:
+  texture: vorace-mob/boss/traine_g_38
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_g_39:
+  texture: vorace-mob/boss/traine_g_39
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_g_40:
+  texture: vorace-mob/boss/traine_g_40
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_g_41:
+  texture: vorace-mob/boss/traine_g_41
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_g_42:
+  texture: vorace-mob/boss/traine_g_42
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_g_43:
+  texture: vorace-mob/boss/traine_g_43
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_g_44:
+  texture: vorace-mob/boss/traine_g_44
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_d_00:
+  texture: vorace-mob/boss/traine_d_00
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_d_01:
+  texture: vorace-mob/boss/traine_d_01
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_d_02:
+  texture: vorace-mob/boss/traine_d_02
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_d_03:
+  texture: vorace-mob/boss/traine_d_03
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_d_04:
+  texture: vorace-mob/boss/traine_d_04
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_d_05:
+  texture: vorace-mob/boss/traine_d_05
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_d_06:
+  texture: vorace-mob/boss/traine_d_06
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_d_07:
+  texture: vorace-mob/boss/traine_d_07
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_d_08:
+  texture: vorace-mob/boss/traine_d_08
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_d_09:
+  texture: vorace-mob/boss/traine_d_09
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_d_10:
+  texture: vorace-mob/boss/traine_d_10
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_d_11:
+  texture: vorace-mob/boss/traine_d_11
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_d_12:
+  texture: vorace-mob/boss/traine_d_12
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_d_13:
+  texture: vorace-mob/boss/traine_d_13
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_d_14:
+  texture: vorace-mob/boss/traine_d_14
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_d_15:
+  texture: vorace-mob/boss/traine_d_15
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_d_16:
+  texture: vorace-mob/boss/traine_d_16
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_d_17:
+  texture: vorace-mob/boss/traine_d_17
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_d_18:
+  texture: vorace-mob/boss/traine_d_18
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_d_19:
+  texture: vorace-mob/boss/traine_d_19
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_d_20:
+  texture: vorace-mob/boss/traine_d_20
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_d_21:
+  texture: vorace-mob/boss/traine_d_21
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_d_22:
+  texture: vorace-mob/boss/traine_d_22
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_d_23:
+  texture: vorace-mob/boss/traine_d_23
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_d_24:
+  texture: vorace-mob/boss/traine_d_24
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_d_25:
+  texture: vorace-mob/boss/traine_d_25
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_d_26:
+  texture: vorace-mob/boss/traine_d_26
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_d_27:
+  texture: vorace-mob/boss/traine_d_27
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_d_28:
+  texture: vorace-mob/boss/traine_d_28
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_d_29:
+  texture: vorace-mob/boss/traine_d_29
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_d_30:
+  texture: vorace-mob/boss/traine_d_30
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_d_31:
+  texture: vorace-mob/boss/traine_d_31
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_d_32:
+  texture: vorace-mob/boss/traine_d_32
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_d_33:
+  texture: vorace-mob/boss/traine_d_33
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_d_34:
+  texture: vorace-mob/boss/traine_d_34
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_d_35:
+  texture: vorace-mob/boss/traine_d_35
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_d_36:
+  texture: vorace-mob/boss/traine_d_36
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_d_37:
+  texture: vorace-mob/boss/traine_d_37
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_d_38:
+  texture: vorace-mob/boss/traine_d_38
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_d_39:
+  texture: vorace-mob/boss/traine_d_39
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_d_40:
+  texture: vorace-mob/boss/traine_d_40
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_d_41:
+  texture: vorace-mob/boss/traine_d_41
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_d_42:
+  texture: vorace-mob/boss/traine_d_42
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_d_43:
+  texture: vorace-mob/boss/traine_d_43
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false
+vmob_boss_traine_d_44:
+  texture: vorace-mob/boss/traine_d_44
+  hauteur: 14
+  montee: 0
+  raccourcis: false
+  liste: false

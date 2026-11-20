@@ -63,6 +63,9 @@ public final class Mobs {
     private double distanceReflexion = 64;
     private volatile String derniereErreur;
     private boolean erreurJournalisee;
+    private final Combats combats;
+    private final IACombat ia;
+    private final Butin butin;
 
     /** Mobs suivis d'un point d'apparition (gardés dans donnees/apparitions.yml). */
     static final class EtatApparition {
@@ -79,7 +82,25 @@ public final class Mobs {
         cleTroupeau = NamespacedKey.fromString("vorace:mob_troupeau");
         cleApparition = NamespacedKey.fromString("vorace:mob_apparition");
         cleBesoins = NamespacedKey.fromString("vorace:mob_besoins");
+        combats = new Combats(plugin, this);
+        ia = new IACombat(plugin, this);
+        butin = new Butin(plugin);
     }
+
+    /** Monté par un joueur ou un autre mob (les affichages de la barre de vie, passagers eux aussi, ne comptent pas). */
+    static boolean monte(Entity e) {
+        for (Entity p : e.getPassengers()) if (!(p instanceof org.bukkit.entity.Display)) return true;
+        return false;
+    }
+
+    /** Vie, niveau et barre des mobs de combat. */
+    Combats combats() { return combats; }
+    /** Cerveau de combat (menace, déplacements, attaques). */
+    IACombat ia() { return ia; }
+    Butin butin() { return butin; }
+    /** Tics écoulés depuis le démarrage des mobs. */
+    long tics() { return tic; }
+
 
     public Path dossier() { return plugin.getDataFolder().toPath(); }
     public Collection<DefinitionMob> definitions() { return definitions.values(); }
@@ -163,6 +184,8 @@ public final class Mobs {
 
     public void arreter() {
         if (tache != null) tache.cancel();
+        try { ia.vider(); } catch (Throwable ignore) { }
+        try { combats.vider(); } catch (Throwable ignore) { }
         for (Suivi s : suivis.values()) sauverBesoins(s);
         sauverRegistre();
     }
@@ -190,6 +213,23 @@ public final class Mobs {
         /** Pensées d'affilée sans un pas alors qu'il veut se déplacer. */
         int bloque, coince;
         double avantX = Double.NaN, avantZ;
+        /** Mob de combat : Vie, Vie maximale, niveau, dernier coup reçu ou donné, tic du dernier coup déjà compté. */
+        double vie, vieMax;
+        int niveau, compteTic = -1;
+        long dernierCombat;
+        String texteNom;
+        boolean dansEquipe;
+        /** Le coup que le mob porte en ce moment (lu par le plugin du combat pendant l'événement de dégâts). */
+        CoupMob coupEnCours;
+        /** Pendant un coup porté par vorace-mob : pas d'animation d'attaque automatique de vorace-core. */
+        boolean sansAnimAuto;
+        /** Combat : cerveau de combat, vitesse de base, traîne de la barre, étiquette de vorace-core. */
+        IACombat.Etat ia;
+        double vitesseBase, vieTraine;
+        long traineDepuis;
+        UUID etiquette;
+        /** Barre de vie : dernières proportions posées (Vie, traîne) et hauteur au-dessus du mob. */
+        float barreV = -1, barreT = -1, barreY;
 
         Suivi(Entity e, DefinitionMob d) {
             this.e = e;
@@ -214,7 +254,7 @@ public final class Mobs {
                 apparition == null ? "" : " apparition=" + apparition) + String.format(Locale.ROOT, " parcouru=%.1f", parcouru)
                 + (vol != null ? String.format(Locale.ROOT, " a-pied=%.1f", vol.parcouru()) : "")
                 + String.format(Locale.ROOT, " pos=%.1f,%.1f,%.1f", l.getX(), l.getY(), l.getZ())
-                + effetsJoues();
+                + Combats.etat(this) + effetsJoues();
         }
 
         /** Décors vivants : sons et particules joués par leurs animations (preuve que l'animation tourne en jeu). */
@@ -287,6 +327,7 @@ public final class Mobs {
                 if (d.marche() > 0) s.vol.marcheur(d.marche());
             }
             suivis.put(e.getUniqueId(), s);
+            if (d.combattant()) combats.charger(s);
             if (s.apparition != null) {
                 EtatApparition et = registre.computeIfAbsent(s.apparition, k -> new EtatApparition());
                 if (et.membres.add(e.getUniqueId())) registreModifie = true;
@@ -324,6 +365,13 @@ public final class Mobs {
     /** Mort (ou retrait) : le point d'apparition le remplacera après son délai. */
     public void mort(Entity e) {
         Suivi s = suivis.remove(e.getUniqueId());
+        if (s != null && s.d.combattant()) {
+            if (e instanceof LivingEntity le && le.isDead()) {
+                try { butin.mort(s, e.getLocation()); } catch (Throwable ex) { erreur("butin " + s.d.id(), ex); }
+            }
+            ia.mort(s);
+            combats.mort(s);
+        }
         String app = s != null ? s.apparition : e.getPersistentDataContainer().get(cleApparition, PersistentDataType.STRING);
         if (app == null) return;
         EtatApparition et = registre.get(app);
@@ -339,6 +387,7 @@ public final class Mobs {
         Suivi s = suivis.get(e.getUniqueId());
         if (s == null) return;
         s.c.blesser(s.d.caractere());
+        if (s.d.combattant()) s.dernierCombat = System.currentTimeMillis();
         if (par != null) s.menace = par;
         if (s.vol != null) {
             Location m = par != null ? par.getLocation() : e.getLocation();
@@ -362,6 +411,11 @@ public final class Mobs {
      * @param apparition point d'apparition (ou null), troupeau : identifiant de troupeau (ou null)
      */
     public Entity invoquer(String id, Location ou, String apparition, String troupeau) {
+        return invoquer(id, ou, apparition, troupeau, 0);
+    }
+
+    /** Comme {@link #invoquer(String, Location, String, String)} ; niveau &gt; 0 : niveau imposé (mob de combat). */
+    public Entity invoquer(String id, Location ou, String apparition, String troupeau, int niveau) {
         DefinitionMob d = definition(id);
         if (d == null || ou.getWorld() == null) return null;
         Modeles modeles = plugin.modeles();
@@ -385,7 +439,7 @@ public final class Mobs {
             e.setPersistent(true);
             if (e instanceof LivingEntity le) {
                 le.setRemoveWhenFarAway(false);
-                if (d.vie() > 0) {
+                if (d.vie() > 0 && !d.combattant()) {
                     AttributeInstance vie = attribut(le, "max_health");
                     if (vie != null) {
                         vie.setBaseValue(d.vie());
@@ -405,6 +459,11 @@ public final class Mobs {
         pdc.set(cleMaison, PersistentDataType.STRING, String.format(Locale.ROOT, "%.2f;%.2f;%.2f", mx, my, mz));
         if (troupeau != null) pdc.set(cleTroupeau, PersistentDataType.STRING, troupeau);
         if (apparition != null) pdc.set(cleApparition, PersistentDataType.STRING, apparition);
+        if (d.combattant()) {
+            int n = niveau > 0 ? niveau : d.combat().tirerNiveau(hasard.nextDouble());
+            // Vie pleine à son niveau (un niveau au-dessus du niveau de base a plus de Vie)
+            pdc.set(combats.cle(), PersistentDataType.STRING, String.format(Locale.ROOT, "%.2f;%d", d.combat().vieAuNiveau(n), n));
+        }
         charger(List.of(e));
         return e;
     }
@@ -503,10 +562,46 @@ public final class Mobs {
         return null;
     }
 
+    // ------------------------------------------------------------------ spectateurs
+
+    /** Joueurs en mode spectateur à qui les porteurs invisibles sont cachés. */
+    private final Set<UUID> spectateurs = new HashSet<>();
+
+    /**
+     * Un joueur en mode spectateur (à terre, caméra d'un ultime) voit les entités invisibles en transparence : le porteur
+     * d'un modèle lui apparaîtrait comme un fantôme. On le lui cache, avec sa barre de vie (elle le chevauche : sans lui,
+     * elle resterait figée) ; le modèle, lui, reste visible. Tout lui est rendu quand il quitte ce mode.
+     */
+    void spectateur(Player p, boolean oui) {
+        if (oui) spectateurs.add(p.getUniqueId());
+        else if (!spectateurs.remove(p.getUniqueId())) return;
+        for (Suivi s : suivis.values()) {
+            if (!(s.e instanceof LivingEntity le) || !le.isInvisible()) continue;
+            cacher(p, s.e, oui);
+            for (Entity passager : s.e.getPassengers()) if (passager instanceof org.bukkit.entity.Display) cacher(p, passager, oui);
+        }
+    }
+
+    private void cacher(Player p, Entity e, boolean oui) {
+        if (oui == p.canSee(e)) {
+            if (oui) p.hideEntity(plugin, e);
+            else p.showEntity(plugin, e);
+        }
+    }
+
+    void spectateurParti(Player p) { spectateurs.remove(p.getUniqueId()); }
+
     // ------------------------------------------------------------------ réflexion
 
     private void tic() {
         tic++;
+        if (tic % 5 == 0) {
+            // nouveaux mobs et nouvelles barres pour ceux qui regardent déjà, et modes changés sans événement
+            for (Player p : Bukkit.getOnlinePlayers()) {
+                boolean spectateur = p.getGameMode() == GameMode.SPECTATOR;
+                if (spectateur || spectateurs.contains(p.getUniqueId())) spectateur(p, spectateur);
+            }
+        }
         if (tic % 20 == 0) {
             Map<String, List<Suivi>> t = new HashMap<>();
             for (Suivi s : suivis.values()) if (s.troupeau != null) t.computeIfAbsent(s.troupeau, k -> new ArrayList<>()).add(s);
@@ -517,6 +612,14 @@ public final class Mobs {
         }
         if (tic % 600 == 0 && registreModifie) sauverRegistre();
         if (tic % 1200 == 0) for (Suivi s : suivis.values()) sauverBesoins(s);
+        if (tic % 2 == 0) {
+            try { combats.tic(suivis.values(), tic); } catch (Throwable ex) { erreur("combat", ex); }
+        }
+        try { ia.ticProjectiles(); } catch (Throwable ex) { erreur("projectiles", ex); }
+        for (Suivi s : new ArrayList<>(suivis.values())) {
+            if (s.ia == null || (!s.ia.engage && !s.ia.rentre)) continue;
+            try { ia.tic(s); } catch (Throwable ex) { erreur("combat " + s.d.id(), ex); }
+        }
         for (Suivi s : suivis.values()) {
             if (s.vol == null || !s.actif || !s.e.isValid()) continue;
             try { voler(s); } catch (Throwable ex) { erreur(s.d.id(), ex); }
@@ -616,7 +719,9 @@ public final class Mobs {
         if (proche == null) return; // personne autour : il ne réfléchit pas
         if (!(e instanceof Mob mob)) return;
         // monté par un joueur ou tenu en laisse : c'est le joueur qui décide
-        if (!e.getPassengers().isEmpty() || (e instanceof LivingEntity le && le.isLeashed())) return;
+        if (monte(e) || (e instanceof LivingEntity le && le.isLeashed())) return;
+        // mob de combat : en combat (ou s'il voit un joueur), c'est le cerveau de combat qui le mène
+        if (s.d.combattant() && ia.penser(s)) return;
         double distMaison = Geometrie.distance(l.getX(), l.getZ(), s.mx, s.mz);
 
         if (s.d.ia().equals("jeu")) {
@@ -728,6 +833,8 @@ public final class Mobs {
             }
             return;
         }
+        // un mob de combat calme ne fuit ni n'attaque avec l'ancien cerveau : c'est le cerveau de combat qui s'en charge
+        if (s.d.combattant() && (action == Action.ATTAQUER || action == Action.FUIR)) return;
         agir(s, mob, modele, action, menace, centre, l);
     }
 
@@ -891,7 +998,14 @@ public final class Mobs {
                     mob.getPathfinder().stopPathfinding();
                     if (tic - s.dernierCoup >= 24) {
                         s.dernierCoup = tic;
-                        menace.damage(s.d.degats(), mob);
+                        if (s.d.combattant()) {
+                            // le plugin du combat lit ce coup pendant l'événement de dégâts (Puissance, type...)
+                            s.dernierCombat = System.currentTimeMillis();
+                            s.coupEnCours = CoupMob.deBase(s.d.combat());
+                            try { menace.damage(Math.max(1, s.d.degats()), mob); } finally { s.coupEnCours = null; }
+                        } else {
+                            menace.damage(s.d.degats(), mob);
+                        }
                     }
                 } else if (tic >= s.prochainPlan) {
                     mob.getPathfinder().moveTo(menace, v * 1.3);
@@ -1031,21 +1145,63 @@ public final class Mobs {
         try {
             Path liste = dossier().resolve("donnees").resolve("exemples.txt");
             List<String> faits = new ArrayList<>(Files.isRegularFile(liste) ? Files.readAllLines(liste) : List.of());
-            if (faits.contains("mobs")) return;
-            for (String f : List.of("mobs/exemple.yml", "zones/exemple.yml", "apparitions/exemple.yml")) {
-                Path cible = dossier().resolve(f);
-                if (Files.exists(cible)) continue;
-                try (InputStream in = plugin.getClass().getClassLoader().getResourceAsStream("exemples/" + f)) {
-                    if (in == null) continue;
-                    Files.createDirectories(cible.getParent());
-                    Files.copy(in, cible);
+            // chaque lot d'exemples n'est installé qu'une fois (supprimer sa ligne de donnees/exemples.txt pour le récupérer)
+            Map<String, List<String>> lots = new LinkedHashMap<>();
+            lots.put("mobs", List.of("mobs/exemple.yml", "zones/exemple.yml", "apparitions/exemple.yml"));
+            lots.put("combat", List.of("mobs/combat.yml"));
+            boolean change = false;
+            // l'exemple de combat de la 1.3.0 (sans cerveau de combat) est remplacé s'il n'a pas été modifié
+            Path ancienCombat = dossier().resolve("mobs/combat.yml");
+            if (Files.isRegularFile(ancienCombat) && !faits.contains("combat-ia")) {
+                String t = Files.readString(ancienCombat);
+                if (t.contains("un niveau, un rang et des stats.") && !t.contains("competences:")) {
+                    Files.delete(ancienCombat);
+                    faits.remove("combat");
                 }
+                faits.add("combat-ia");
+                change = true;
             }
-            faits.add("mobs");
+            // l'exemple de la 1.4.0 (sans effets en modèles, attaques lentes) : mis de côté (combat.yml.ancien), remplacé
+            if (!faits.contains("combat-effets")) {
+                if (Files.isRegularFile(ancienCombat) && !Files.readString(ancienCombat).contains("effets:")) {
+                    Files.move(ancienCombat, ancienCombat.resolveSibling("combat.yml.ancien"), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                    faits.remove("combat");
+                }
+                faits.add("combat-effets");
+                change = true;
+            }
+            // l'exemple de la 1.5.0 (groupes trop durs) : mis de côté (combat.yml.ancien), remplacé
+            if (!faits.contains("combat-equilibre")) {
+                if (Files.isRegularFile(ancienCombat) && !Files.readString(ancienCombat).contains("presse:")) {
+                    Files.move(ancienCombat, ancienCombat.resolveSibling("combat.yml.ancien"), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                    faits.remove("combat");
+                }
+                faits.add("combat-equilibre");
+                change = true;
+            }
+            for (Map.Entry<String, List<String>> lot : lots.entrySet()) {
+                if (faits.contains(lot.getKey())) continue;
+                installer(lot.getValue());
+                faits.add(lot.getKey());
+                change = true;
+            }
+            if (!change) return;
             Files.createDirectories(liste.getParent());
             Files.write(liste, faits);
         } catch (IOException e) {
             plugin.getLogger().warning("Impossible de créer l'exemple de mobs : " + e.getMessage());
+        }
+    }
+
+    private void installer(List<String> fichiers) throws IOException {
+        for (String f : fichiers) {
+            Path cible = dossier().resolve(f);
+            if (Files.exists(cible)) continue;
+            try (InputStream in = plugin.getClass().getClassLoader().getResourceAsStream("exemples/" + f)) {
+                if (in == null) continue;
+                Files.createDirectories(cible.getParent());
+                Files.copy(in, cible);
+            }
         }
     }
 }

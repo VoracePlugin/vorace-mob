@@ -1,0 +1,37 @@
+# Objets de la barre de vie des mobs de combat (installés et mis à jour par vorace-mob à chaque démarrage).
+# Ils ne servent qu'à l'affichage au-dessus des mobs.
+
+vmob_barre_cadre_normal:
+  materiau: PAPER
+  nom: "<gray>vmob_barre_cadre_normal"
+  texture: vorace-mob/barre/cadre_normal
+
+vmob_barre_cadre_elite:
+  materiau: PAPER
+  nom: "<gray>vmob_barre_cadre_elite"
+  texture: vorace-mob/barre/cadre_elite
+
+vmob_barre_cadre_elite_pp:
+  materiau: PAPER
+  nom: "<gray>vmob_barre_cadre_elite_pp"
+  texture: vorace-mob/barre/cadre_elite_pp
+
+vmob_barre_cadre_boss:
+  materiau: PAPER
+  nom: "<gray>vmob_barre_cadre_boss"
+  texture: vorace-mob/barre/cadre_boss
+
+vmob_barre_vie:
+  materiau: PAPER
+  nom: "<gray>vmob_barre_vie"
+  texture: vorace-mob/barre/vie
+
+vmob_barre_traine:
+  materiau: PAPER
+  nom: "<gray>vmob_barre_traine"
+  texture: vorace-mob/barre/traine
+
+vmob_barre_vide:
+  materiau: PAPER
+  nom: "<gray>vmob_barre_vide"
+  texture: vorace-mob/barre/vide

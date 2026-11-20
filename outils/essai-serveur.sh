@@ -143,6 +143,20 @@ sleep 22
 cmd "vmob info zoo_"
 sleep 23
 cmd "vmob info zoo_"
+# mobs de combat : joueur en survie (protégé), ils le repèrent, se placent, attaquent (coups annoncés, projectiles)
+cmd "gamemode survival Testeur"
+cmd "tp Testeur 1.5 -60 -6.5"
+cmd "effect give Testeur resistance 120 4 true"
+cmd "effect give Testeur regeneration 120 4 true"
+cmd "vmob invoquer cr_meche_sourde 2"
+cmd "vmob invoquer cr_grande_meche"
+sleep 5
+cmd "vmob info cr_"
+sleep 5
+cmd "vmob info cr_"
+sleep 5
+cmd "vmob info cr_"
+cmd "vmob menace 32"
 wait $BOT
 sleep 1
 cmd "stop"
@@ -161,6 +175,12 @@ echo "erreurs de Vorace dans la console : $ERREURS"
 if [ "$ERREURS" -gt 0 ]; then echo "ECHEC : erreurs dans la console"; exit 1; fi
 grep -aq 'Enabling VoraceMob' journal.txt || { echo "ECHEC : vorace-mob n'a pas démarré"; exit 1; }
 grep -aq '3 golem_paisible invoqué(s) en troupeau' journal.txt || { echo "ECHEC : invocation des mobs"; exit 1; }
+echo "===== Mobs de combat"; grep -a 'mob=cr_' journal.txt | tail -6
+grep -aq 'mob=cr_meche_sourde .*combat=oui' journal.txt || { echo "ECHEC : la Mèche-sourde n'entre pas en combat"; exit 1; }
+grep -aqE 'mob=cr_meche_sourde .*attaques=[1-9]' journal.txt || { echo "ECHEC : la Mèche-sourde n'attaque pas"; exit 1; }
+grep -aqE 'mob=cr_grande_meche .*combat=oui' journal.txt || { echo "ECHEC : la Grande Mèche n'entre pas en combat"; exit 1; }
+grep -aqE 'mob=cr_[a-z_]* .*effets=[1-9]' journal.txt || { echo "ECHEC : aucun effet en modèle 3D posé (fx_cire_...)"; exit 1; }
+if grep -aq 'Mobs : erreur' journal.txt; then echo "ECHEC : erreur dans les mobs"; grep -a -A25 'Mobs : erreur' journal.txt | head -60; exit 1; fi
 MOBS_VUS=$(grep -ao 'mob=[a-z_]* action=[a-z]*' journal.txt | sort -u)
 echo "mobs vus : $MOBS_VUS"
 echo "$MOBS_VUS" | grep -q 'mob=golem_paisible' || { echo "ECHEC : les golems de l'essai ne pensent pas"; exit 1; }
