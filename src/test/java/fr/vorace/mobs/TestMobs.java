@@ -346,11 +346,11 @@ public final class TestMobs {
             && Math.abs(mo[0][0] + Combats.INT_L * 0.25f) < 1e-5 && Math.abs(mo[2][0] - Combats.INT_L * 0.3f) < 1e-5
             && Math.abs(mo[0][1] + mo[1][1] + mo[2][1] - Combats.INT_L) < 1e-5, "barre : Vie, traîne et vide côte à côte, sans recouvrement");
         verifier(Combats.morceaux(1, 1, 330)[0][1] > 0.02f && Combats.morceaux(0, 0, 330)[0][1] == 0, "barre : toujours un peu de rouge tant qu'il vit");
-        String bb = IACombat.barreBoss(1600, 2000, 3200, Combat.Rang.ELITE_PP);
-        verifier(bb.contains("<glyphe:vmob_boss_cadre_elite_pp_g><decalage:-1><glyphe:vmob_boss_cadre_elite_pp_d>")
-            && bb.contains("<glyphe:vmob_boss_vie_g_44><decalage:-1><glyphe:vmob_boss_vie_d_00>")
-            && bb.contains("<glyphe:vmob_boss_traine_g_44><decalage:-1><glyphe:vmob_boss_traine_d_11>")
-            && bb.split("decalage:-193", -1).length == 3, "barre de boss : cadre, traîne, Vie en deux moitiés");
+        String barreDeBoss = IACombat.barreBoss(1600, 2000, 3200, Combat.Rang.ELITE_PP);
+        verifier(barreDeBoss.contains("<glyphe:vmob_boss_cadre_elite_pp_g><decalage:-1><glyphe:vmob_boss_cadre_elite_pp_d>")
+            && barreDeBoss.contains("<glyphe:vmob_boss_vie_g_44><decalage:-1><glyphe:vmob_boss_vie_d_00>")
+            && barreDeBoss.contains("<glyphe:vmob_boss_traine_g_44><decalage:-1><glyphe:vmob_boss_traine_d_11>")
+            && barreDeBoss.split("decalage:-193", -1).length == 3, "barre de boss : cadre, traîne, Vie en deux moitiés");
         verifier(IACombat.barreBoss(1, 1, 3200, Combat.Rang.BOSS).contains("vmob_boss_vie_g_01") && IACombat.barreBoss(3200, 3200, 3200, Combat.Rang.BOSS).contains("vmob_boss_vie_d_44"),
             "barre de boss : pleine, et un palier au moins tant qu'il vit");
         verifier(IACombat.dureeMarque(9) == 8 && IACombat.dureeMarque(18) == 18 && IACombat.dureeMarque(47) == 44 && IACombat.dureeMarque(3) == 4
