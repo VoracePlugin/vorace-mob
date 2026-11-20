@@ -33,20 +33,32 @@ public final class VoraceMob extends JavaPlugin {
     public Mobs mobs() { return mobs; }
 
     /**
-     * Avant que Vorace ne démarre : installe (ou met à jour) les glyphes de la barre de vie des mobs de combat dans
-     * plugins/Vorace (glyphes/vorace-mob-barre.yml et ressources/textures/vorace-mob/barre/).
+     * Avant que Vorace ne démarre : installe (ou met à jour) dans plugins/Vorace ce que vorace-mob affiche : les objets de
+     * la barre de vie des mobs, les glyphes de la barre de boss et les modèles d'effets des attaques d'exemple
+     * (« fx_cire_... »). La liste est dans installation.txt (ressource → fichier dans plugins/Vorace). Les anciennes images
+     * de vorace-mob qui ne servent plus sont retirées.
      */
     @Override
     public void onLoad() {
         Path vorace = getDataFolder().toPath().getParent().resolve("Vorace");
-        try {
-            List<String> images = new java.util.ArrayList<>(List.of("fond", "cadre_normal", "cadre_elite", "cadre_elite_pp", "cadre_boss"));
-            for (int k = 0; k <= 50; k++) { images.add(String.format("vie_%02d", k)); images.add(String.format("traine_%02d", k)); }
-            copier("glyphes/vorace-mob-barre.yml", vorace.resolve("glyphes").resolve("vorace-mob-barre.yml"));
-            Path dossier = vorace.resolve("ressources").resolve("textures").resolve("vorace-mob").resolve("barre");
-            for (String i : images) copier("glyphes/barre/" + i + ".png", dossier.resolve(i + ".png"));
+        try (java.io.InputStream in = getClass().getClassLoader().getResourceAsStream("installation.txt")) {
+            if (in == null) throw new IOException("installation.txt absent");
+            java.util.Set<Path> gardes = new java.util.HashSet<>();
+            for (String ligne : new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8).split("\n")) {
+                String[] x = ligne.trim().split(" ");
+                if (x.length != 2) continue;
+                Path cible = vorace.resolve(x[1]);
+                copier(x[0], cible);
+                gardes.add(cible);
+            }
+            Path images = vorace.resolve("ressources").resolve("textures").resolve("vorace-mob");
+            if (Files.isDirectory(images)) {
+                try (java.util.stream.Stream<Path> f = Files.walk(images)) {
+                    for (Path x : f.filter(Files::isRegularFile).filter(x -> !gardes.contains(x)).toList()) Files.deleteIfExists(x);
+                }
+            }
         } catch (IOException | RuntimeException e) {
-            getLogger().warning("Glyphes de la barre de vie non installés : " + e.getMessage());
+            getLogger().warning("Barres et effets de vorace-mob non installés dans Vorace : " + e.getMessage());
         }
     }
 

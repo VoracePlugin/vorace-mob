@@ -60,13 +60,20 @@ final class IACombat {
         Competence enCours;
         Location visee;
         Vector direction;
-        int sens = 1, phase, attaques;
+        int sens = 1, phase, attaques, tirs;
+        /** Attaque en cours : centres des zones, marques au sol (modèles), bond et pluie déjà faits. */
+        final List<Location> zones = new ArrayList<>();
+        final List<Modeles.Instance> marques = new ArrayList<>();
+        boolean bondFait, pluieFaite;
+        long bondJusqua;
+        /** Tics des derniers coups reçus (pressé : 3 coups en 2 s). */
+        final java.util.ArrayDeque<Long> coups = new java.util.ArrayDeque<>();
         String mode = "garde", anim;
         double vitessePhase = 1, bonus = 1;
         BossBar barre;
     }
 
-    /** Un projectile en vol. */
+    /** Un projectile en vol, avec son modèle et la marque de son point d'impact. */
     private static final class Projectile {
         final Mobs.Suivi s;
         final Competence c;
@@ -74,6 +81,7 @@ final class IACombat {
         final double hauteur;
         final int duree;
         int t;
+        Modeles.Instance fx, marque;
 
         Projectile(Mobs.Suivi s, Competence c, Vector depart, Vector arrivee, double hauteur, int duree) {
             this.s = s; this.c = c; this.depart = depart; this.arrivee = arrivee; this.hauteur = hauteur; this.duree = duree;
@@ -82,6 +90,19 @@ final class IACombat {
         Vector position(double f) {
             Vector p = depart.clone().multiply(1 - f).add(arrivee.clone().multiply(f));
             return p.setY(p.getY() + 4 * hauteur * f * (1 - f));
+        }
+    }
+
+    /** Une flaque laissée par un impact : elle brûle ceux qui restent dedans (un coup toutes les 10 tics). */
+    private static final class Flaque {
+        final Mobs.Suivi s;
+        final Competence c;
+        final Location centre;
+        final long fin;
+        final Map<UUID, Long> touches = new HashMap<>();
+
+        Flaque(Mobs.Suivi s, Competence c, Location centre, long fin) {
+            this.s = s; this.c = c; this.centre = centre; this.fin = fin;
         }
     }
 
@@ -95,6 +116,9 @@ final class IACombat {
     /** joueur → mobs engagés sur lui, du plus ancien au plus récent (8 au plus). */
     private final Map<UUID, LinkedHashSet<UUID>> parJoueur = new HashMap<>();
     private final List<Projectile> projectiles = new ArrayList<>();
+    private final List<Flaque> flaques = new ArrayList<>();
+    /** joueur en combat → {x, z, vx, vz} : son allure lissée, pour viser où il va. */
+    private final Map<UUID, double[]> allures = new HashMap<>();
     private final Set<String> boucles = new HashSet<>();
 
     IACombat(VoraceMob plugin, Mobs mobs) {
@@ -190,6 +214,9 @@ final class IACombat {
         e.cible = null; e.provocateur = null; e.enCours = null; e.engage = false; e.rentre = true; e.phase = 0;
         e.vitessePhase = 1; e.bonus = 1; e.enrage = false;
         cacherBarre(s);
+        retirerMarques(e);
+        e.bondJusqua = 0;
+        e.coups.clear();
         for (UUID u : e.invocations) { Entity x = Bukkit.getEntity(u); if (x != null && x.isValid()) x.remove(); }
         e.invocations.clear();
         mobs.combats().soigner(s, s.vieMax);
@@ -285,6 +312,7 @@ final class IACombat {
                 // interrompue pendant le signal : elle ne part pas, sa recharge repart à moitié
                 s.ia.prete.put(c.id(), tic() + c.recharge() / 2);
                 s.ia.enCours = null;
+                retirerMarques(s.ia);
                 Modeles.Instance m = modele(s);
                 if (m != null && c.animation() != null && c.animation().equals(m.animation())) m.arreterAnimation();
             }
@@ -383,6 +411,7 @@ final class IACombat {
             suivreAttaque(s, mob, m, cible);
             return;
         }
+        if (t < e.bondJusqua) { if (cible != null) regarder(mob, cible.getLocation()); return; }   // bond en cours : on le laisse filer
         if (t < e.immobile) { arreter(mob); if (cible != null) regarder(mob, cible.getLocation()); jouerBoucle(s, m, "garde"); }
         if (t < e.libreA || cible == null) {
             if (cible != null && t >= e.immobile) regarder(mob, cible.getLocation());
@@ -413,7 +442,7 @@ final class IACombat {
         AttributeInstance a = Mobs.attribut(mob, "movement_speed");
         double ratio = 1;
         if (a != null && s.vitesseBase > 0) ratio = Math.max(0.2, Math.min(2, a.getValue() / s.vitesseBase));
-        return 0.105 * s.d.combat().ia().vitesse() * s.ia.vitessePhase * ratio;
+        return 0.13 * s.d.combat().ia().vitesse() * s.ia.vitessePhase * ratio;
     }
 
     private void bouger(Mobs.Suivi s, Mob mob, Modeles.Instance m, Player cible, long t) {
@@ -449,7 +478,7 @@ final class IACombat {
         if (ia.distance() && d < min - 0.3) {
             // trop près : il recule face à la cible, ou se décale si un mur le bloque
             Vector recul = versCible.clone().multiply(-1).add(separation).normalize();
-            if (deplacer(mob, recul, vitesse(s, mob) * 0.9)) { e.mode = "recul"; jouerBoucle(s, m, "recul"); return; }
+            if (deplacer(mob, recul, vitesse(s, mob) * 1.1)) { e.mode = "recul"; jouerBoucle(s, m, "recul"); return; }
             Vector cote = new Vector(-versCible.getZ() * e.sens, 0, versCible.getX() * e.sens);
             if (!deplacer(mob, cote, vitesse(s, mob))) { e.sens = -e.sens; arreter(mob); jouerBoucle(s, m, "garde"); return; }
             jouerBoucle(s, m, e.sens > 0 ? "gauche" : "droite");
@@ -467,7 +496,7 @@ final class IACombat {
             // correction pour rester au milieu de sa bande de distance
             double milieu = (min + max) / 2;
             Vector dir = cote.clone().add(versCible.clone().multiply(Math.max(-0.6, Math.min(0.6, (d - milieu) * 0.25)))).add(separation);
-            if (dir.lengthSquared() > 1e-4 && deplacer(mob, dir.normalize(), vitesse(s, mob) * 0.85)) {
+            if (dir.lengthSquared() > 1e-4 && deplacer(mob, dir.normalize(), vitesse(s, mob))) {
                 jouerBoucle(s, m, e.sens > 0 ? "gauche" : "droite");
                 return;
             }
@@ -577,7 +606,7 @@ final class IACombat {
         for (Competence a : cb.competences()) {
             if (t < e.prete.getOrDefault(a.id(), 0L) || e.phase < a.phase() || ratio > a.vieMax()) continue;
             boolean ok = switch (a.forme()) {
-                case CERCLE -> d <= a.rayon() + 0.5;
+                case CERCLE -> d <= a.porteeMax() + 0.3;
                 case CONE, LIGNE -> d <= a.rayon() && d >= a.porteeMin() && vue;
                 case CONTACT -> d <= a.porteeMax() + 0.3 && d >= a.porteeMin();
                 default -> d >= a.porteeMin() && d <= a.porteeMax() + 0.3 && vue;
@@ -586,6 +615,8 @@ final class IACombat {
             pretes.add(a);
             total += a.poids();
         }
+        // une attaque qui le dégage (bond en arrière) passe avant tout : collé ou pressé, il se dégage
+        for (Competence a : pretes) if (a.bond() < 0) return a;
         if (!pretes.isEmpty() && total > 0) {
             double r = hasard.nextDouble() * total;
             for (Competence a : pretes) { r -= a.poids(); if (r <= 0) return a; }
@@ -615,11 +646,50 @@ final class IACombat {
         e.direction = vise.getLocation().toVector().subtract(l.toVector()).setY(0);
         if (e.direction.lengthSquared() < 1e-4) e.direction = l.getDirection().setY(0);
         e.direction.normalize();
-        e.visee = switch (c.forme()) {
-            case ZONE -> sol(vise.getLocation());
-            case CERCLE, CONE, LIGNE -> sol(l);
-            default -> null;
-        };
+        e.tirs = 0;
+        e.bondFait = false;
+        e.pluieFaite = false;
+        e.zones.clear();
+        retirerMarques(e);
+        switch (c.forme()) {
+            case ZONE -> {
+                // le premier cercle sur la cible, le deuxième sur sa route, les autres autour
+                Location c0 = sol(vise.getLocation());
+                e.zones.add(c0);
+                for (int k = 1; k < c.zones(); k++) {
+                    Location z = null;
+                    if (k == 1) {
+                        z = predire(vise, c.signal(), c.anticipation());
+                        if (z.distanceSquared(vise.getLocation()) < c.rayon() * c.rayon() * 0.5) z = null;
+                    }
+                    if (z == null) {
+                        double a = hasard.nextDouble() * Math.PI * 2, r = c.dispersion() * (0.6 + 0.4 * hasard.nextDouble());
+                        z = vise.getLocation().add(Math.cos(a) * r, 0, Math.sin(a) * r);
+                    }
+                    e.zones.add(sol(z));
+                }
+                e.visee = c0;
+            }
+            case CERCLE -> {
+                e.visee = sol(l);
+                e.zones.add(e.visee);
+            }
+            case CONE, LIGNE -> e.visee = sol(l);
+            default -> e.visee = null;
+        }
+        // marques au sol en modèles animés (sans modèle : particules, pendant le signal)
+        if (c.effets().marque() != null) {
+            if (c.forme() == Competence.Forme.ZONE || c.forme() == Competence.Forme.CERCLE) {
+                for (Location z : e.zones) ajouter(e.marques, marqueFx(c, z, c.rayon(), c.signal(), 0));
+            } else if (c.forme() == Competence.Forme.LIGNE) {
+                double cote = Math.max(0.5, c.largeur());
+                int n = (int) Math.max(1, Math.ceil(c.rayon() / cote));
+                for (int k = 0; k < n; k++) {
+                    Location z = e.visee.clone().add(e.direction.clone().multiply((k + 0.5) * cote));
+                    ajouter(e.marques, marqueFx(c, z, cote, c.signal(), yaw(e.direction)));
+                }
+            }
+        }
         if (m != null) {
             if (c.animation() != null && m.modele().animations().containsKey(c.animation())) m.jouer(c.animation(), false);
             else if (c.forme() == Competence.Forme.CONTACT) m.jouerAuto("attaque");
@@ -644,54 +714,103 @@ final class IACombat {
     private void suivreAttaque(Mobs.Suivi s, Mob mob, Modeles.Instance m, Player cible) {
         Etat e = s.ia;
         Competence c = e.enCours;
-        long dt = tic() - e.t0;
+        long t = tic(), dt = t - e.t0;
         Player vise = Bukkit.getPlayer(e.cibleAttaque);
         if (!valide(vise, mob)) vise = cible;
-        arreter(mob);
+        boolean bond = t < e.bondJusqua;
+        if (!bond) arreter(mob);
+        // il suit sa cible du regard tant qu'il vise (contact, projectile) ; une zone posée ne bouge plus
+        if (vise != null && !bond && (c.forme() == Competence.Forme.CONTACT || c.forme() == Competence.Forme.PROJECTILE)) {
+            regarder(mob, vise.getLocation());
+            Vector dir = vise.getLocation().toVector().subtract(mob.getLocation().toVector()).setY(0);
+            if (dir.lengthSquared() > 1e-4) e.direction = dir.normalize();
+        }
         if (dt < c.signal()) {
-            // signal : il vise (sauf une zone déjà posée), la zone se remplit au sol
-            if (vise != null && (c.forme() == Competence.Forme.CONTACT || c.forme() == Competence.Forme.PROJECTILE)) {
-                regarder(mob, vise.getLocation());
-                Location l = mob.getLocation();
-                Vector dir = vise.getLocation().toVector().subtract(l.toVector()).setY(0);
-                if (dir.lengthSquared() > 1e-4) e.direction = dir.normalize();
-            }
-            if (dt % 2 == 0) marquer(s, mob, c, (double) dt / Math.max(1, c.signal()));
-            if (c.forme() == Competence.Forme.PROJECTILE && dt % 3 == 0) {
-                Location main = depart(s, mob, c);
+            if (e.marques.isEmpty() && dt % 2 == 0) marquer(s, mob, c, (double) dt / Math.max(1, c.signal()));
+            if (c.forme() == Competence.Forme.PROJECTILE && c.effets().projectile() == null && dt % 3 == 0) {
+                Location main = depart(s, mob, c, 0);
                 main.getWorld().spawnParticle(Particle.FLAME, main, 2, 0.08, 0.08, 0.08, 0.01);
             }
             if (c.fixation() != null && vise != null && dt % 4 == 0) {
                 vise.getWorld().spawnParticle(Particle.DUST, vise.getLocation().add(0, 2.4, 0), 6, 0.15, 0.15, 0.15, 0,
                     new Particle.DustOptions(Color.fromRGB(0xFF2020), 1.4f));
             }
+            // la pluie commence à tomber un peu avant le coup : elle touche le sol quand il tombe
+            if (c.forme() == Competence.Forme.ZONE && c.effets().pluie() != null && !e.pluieFaite && dt >= c.signal() - 7) {
+                e.pluieFaite = true;
+                for (Location z : e.zones) fx(c.effets().pluie(), z, hasard.nextFloat() * 360, "pluie", c.rayon());
+            }
             return;
         }
-        if (!e.frappe) {
-            e.frappe = true;
-            executer(s, mob, c, vise);
+        // les tirs d'une salve partent un par un
+        int dus = (int) Math.min(c.salve(), (dt - c.signal()) / c.intervalle() + 1);
+        while (e.tirs < dus) {
+            executer(s, mob, c, vise, e.tirs);
+            e.tirs++;
         }
-        if (dt < c.signal() + c.actif() && e.visee != null && (c.forme() == Competence.Forme.ZONE || c.forme() == Competence.Forme.CERCLE)) {
-            effetZone(e.visee, c);
+        if (e.tirs >= c.salve() && c.bond() != 0 && !e.bondFait) {
+            e.bondFait = true;
+            bondir(s, mob, c);
+        }
+        if (c.effets().pluie() == null && dt < c.signal() + c.actif() && (c.forme() == Competence.Forme.ZONE || c.forme() == Competence.Forme.CERCLE)) {
+            for (Location z : e.zones) effetZone(z, c);
         }
         if (dt >= c.total()) {
             e.prete.put(c.id(), e.t0 + Math.max(c.recharge(), c.total()));
             e.enCours = null;
-            e.libreA = tic() + hasard.nextInt(6);
+            e.marques.clear();
+            e.libreA = tic() + hasard.nextInt(5);
         }
     }
 
-    private Location depart(Mobs.Suivi s, Mob mob, Competence c) {
+    /** Après son coup, le mob bondit (en arrière si {@code bond} est négatif) ; il cherche un côté libre si un mur le gêne. */
+    private void bondir(Mobs.Suivi s, Mob mob, Competence c) {
+        Vector dir = s.ia.direction.clone().multiply(c.bond() < 0 ? -1 : 1);
+        double dist = Math.abs(c.bond());
+        for (double angle : new double[] {0, 50, -50, 90, -90}) {
+            Vector d = tourner(dir, angle);
+            if (!libre(mob, d, Math.min(dist, 3))) continue;
+            mob.getPathfinder().stopPathfinding();
+            mob.setVelocity(new Vector(d.getX() * dist / 7.2, 0.4, d.getZ() * dist / 7.2));
+            s.ia.bondJusqua = tic() + 13;
+            mob.getWorld().playSound(mob.getLocation(), Sound.ENTITY_BLAZE_SHOOT, 0.4f, 1.6f);
+            return;
+        }
+    }
+
+    private static Vector tourner(Vector v, double degres) {
+        double a = Math.toRadians(degres), c = Math.cos(a), s = Math.sin(a);
+        return new Vector(v.getX() * c - v.getZ() * s, 0, v.getX() * s + v.getZ() * c);
+    }
+
+    /** La voie est libre sur {@code dist} blocs (pieds et tête), avec du sol au bout. */
+    private static boolean libre(Mob mob, Vector dir, double dist) {
+        Location l = mob.getLocation();
+        World w = l.getWorld();
+        for (double k = 1; k <= dist + 0.01; k += 1) {
+            Block pieds = w.getBlockAt((int) Math.floor(l.getX() + dir.getX() * k), l.getBlockY(), (int) Math.floor(l.getZ() + dir.getZ() * k));
+            if (!pieds.isPassable() || !pieds.getRelative(0, 1, 0).isPassable()) return false;
+            if (k + 1 > dist + 0.01) {
+                Block d = pieds.getRelative(0, -1, 0);
+                if (d.isPassable() && d.getRelative(0, -1, 0).isPassable() && d.getRelative(0, -2, 0).isPassable()) return false;
+            }
+        }
+        return true;
+    }
+
+    /** Point de départ du tir n° k : l'os du modèle prévu pour lui, sinon au-dessus de ses yeux. */
+    private Location depart(Mobs.Suivi s, Mob mob, Competence c, int k) {
         Location o = null;
-        if (c.depart() != null && plugin.modeles() != null) {
+        String os = c.depart(k);
+        if (os != null && plugin.modeles() != null) {
             Modeles.Instance m = modele(s);
-            if (m != null) o = m.positionOs(c.depart());
+            if (m != null) o = m.positionOs(os);
         }
         return o != null ? o : mob.getEyeLocation().add(0, 0.4, 0);
     }
 
-    private void executer(Mobs.Suivi s, Mob mob, Competence c, Player vise) {
-        s.ia.attaques++;
+    private void executer(Mobs.Suivi s, Mob mob, Competence c, Player vise, int k) {
+        if (k == 0) s.ia.attaques++;
         Location l = mob.getLocation();
         World w = l.getWorld();
         switch (c.forme()) {
@@ -700,27 +819,28 @@ final class IACombat {
                 Vector vers = vise.getLocation().toVector().subtract(l.toVector()).setY(0);
                 double d = vers.length();
                 boolean devant = d < 0.8 || vers.normalize().dot(s.ia.direction) > 0.45;
-                if (d <= c.porteeMax() + 0.7 && devant && Math.abs(vise.getLocation().getY() - l.getY()) < 2.5) toucher(s, mob, c, vise);
+                if (d <= c.porteeMax() + 0.7 && devant && Math.abs(vise.getLocation().getY() - l.getY()) < 2.5) toucher(s, mob, c, vise, 1);
                 w.playSound(l, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 0.6f, 0.8f);
             }
             case PROJECTILE -> {
-                if (vise == null) return;
-                Location a = depart(s, mob, c);
-                Location b = sol(vise.getLocation());
-                double dist = a.distance(b);
-                int duree = (int) Math.max(8, Math.min(30, dist / 0.55));
-                projectiles.add(new Projectile(s, c, a.toVector(), b.toVector().add(new Vector(0, 0.1, 0)), 1 + dist * 0.18, duree));
-                w.playSound(a, Sound.ENTITY_BLAZE_SHOOT, 0.7f, 1.2f);
+                if (vise != null) lancer(s, mob, c, vise, k);
             }
             case ZONE, CERCLE -> {
-                Location centre = s.ia.visee;
-                for (Player p : w.getPlayers()) {
-                    if (!valide(p, mob)) continue;
-                    Location pl = p.getLocation();
-                    if (Geometrie.distance(pl.getX(), pl.getZ(), centre.getX(), centre.getZ()) <= c.rayon() + 0.3
-                        && Math.abs(pl.getY() - centre.getY()) < 2.5) toucher(s, mob, c, p);
+                Set<UUID> touches = new HashSet<>();
+                for (Location centre : s.ia.zones) {
+                    for (Player p : w.getPlayers()) {
+                        if (!valide(p, mob) || touches.contains(p.getUniqueId())) continue;
+                        Location pl = p.getLocation();
+                        if (Geometrie.distance(pl.getX(), pl.getZ(), centre.getX(), centre.getZ()) <= c.rayon() + 0.3
+                            && Math.abs(pl.getY() - centre.getY()) < 2.5) {
+                            touches.add(p.getUniqueId());
+                            toucher(s, mob, c, p, 1);
+                        }
+                    }
+                    if (c.forme() == Competence.Forme.CERCLE) fx(c.effets().impact(), centre, hasard.nextFloat() * 360, "impact", c.rayon());
+                    if (c.flaque() > 0) flaque(s, c, centre);
+                    w.playSound(centre, Sound.BLOCK_LAVA_EXTINGUISH, 0.8f, 0.7f);
                 }
-                w.playSound(centre, Sound.BLOCK_LAVA_EXTINGUISH, 0.8f, 0.7f);
             }
             case CONE -> {
                 double cos = Math.cos(Math.toRadians(c.largeur() / 2));
@@ -728,7 +848,7 @@ final class IACombat {
                     if (!valide(p, mob)) continue;
                     Vector v = p.getLocation().toVector().subtract(l.toVector()).setY(0);
                     double d = v.length();
-                    if (d <= c.rayon() && (d < 0.8 || v.normalize().dot(s.ia.direction) >= cos) && Math.abs(p.getLocation().getY() - l.getY()) < 2.5) toucher(s, mob, c, p);
+                    if (d <= c.rayon() && (d < 0.8 || v.normalize().dot(s.ia.direction) >= cos) && Math.abs(p.getLocation().getY() - l.getY()) < 2.5) toucher(s, mob, c, p, 1);
                 }
                 w.playSound(l, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 0.9f, 0.6f);
             }
@@ -738,16 +858,39 @@ final class IACombat {
                     if (!valide(p, mob)) continue;
                     Vector v = p.getLocation().toVector().subtract(l.toVector()).setY(0);
                     double avant = v.dot(dir), cote = Math.abs(v.getX() * -dir.getZ() + v.getZ() * dir.getX());
-                    if (avant >= -0.3 && avant <= c.rayon() && cote <= c.largeur() / 2 + 0.3 && Math.abs(p.getLocation().getY() - l.getY()) < 2.5) toucher(s, mob, c, p);
+                    if (avant >= -0.3 && avant <= c.rayon() && cote <= c.largeur() / 2 + 0.3 && Math.abs(p.getLocation().getY() - l.getY()) < 2.5) toucher(s, mob, c, p, 1);
                 }
                 w.playSound(l, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 0.9f, 0.5f);
             }
         }
     }
 
-    /** Le coup d'une attaque touche un joueur : le plugin du combat lit {@link CoupMob} pendant l'événement. */
-    void toucher(Mobs.Suivi s, Mob mob, Competence c, Player p) {
-        CoupMob coup = CoupMob.de(s.d.combat(), s.niveau, c, s.ia.bonus);
+    /**
+     * Lance un projectile. Il vise où la cible sera à l'arrivée si elle garde son allure ({@code anticipation}). Dans une
+     * salve, le 2e tir anticipe plus loin et le 3e vise la cible elle-même : continuer tout droit ou s'arrêter ne suffit
+     * pas, il faut changer de direction.
+     */
+    private void lancer(Mobs.Suivi s, Mob mob, Competence c, Player vise, int k) {
+        Location a = depart(s, mob, c, k);
+        double ant = k % 3 == 0 ? c.anticipation() : k % 3 == 1 ? Math.min(2, c.anticipation() * 1.8 + 0.2) : 0;
+        int duree = (int) Math.max(4, Math.round(a.distance(vise.getLocation()) / c.vitesse()));
+        Location b = sol(predire(vise, duree, ant));
+        double dist = a.distance(b);
+        duree = (int) Math.max(4, Math.min(40, Math.round(dist / c.vitesse())));
+        Projectile p = new Projectile(s, c, a.toVector(), b.toVector().add(new Vector(0, 0.1, 0)), 0.4 + dist * 0.07, duree);
+        Vector dir = b.toVector().subtract(a.toVector()).setY(0);
+        p.fx = fx(c.effets().projectile(), a, dir.lengthSquared() > 1e-4 ? yaw(dir) : 0, "vol", Math.max(0.8, c.rayon() / 1.5));
+        p.marque = marqueFx(c, b, c.rayon(), duree, 0);
+        projectiles.add(p);
+        a.getWorld().playSound(a, Sound.ENTITY_BLAZE_SHOOT, 0.7f, 1.2f);
+    }
+
+    /**
+     * Le coup d'une attaque touche un joueur : le plugin du combat lit {@link CoupMob} pendant l'événement.
+     * {@code part} : part des dégâts (1 pour le coup, moins pour une flaque).
+     */
+    void toucher(Mobs.Suivi s, Mob mob, Competence c, Player p, double part) {
+        CoupMob coup = CoupMob.de(s.d.combat(), s.niveau, c, s.ia.bonus * part);
         s.coupEnCours = coup;
         s.sansAnimAuto = true;
         try {
@@ -757,47 +900,205 @@ final class IACombat {
             s.coupEnCours = null;
             s.sansAnimAuto = false;
         }
+        if (c.repousse() > 0 && part >= 1 && p.isValid() && !p.isDead()) {
+            Vector v = p.getLocation().toVector().subtract(mob.getLocation().toVector()).setY(0);
+            if (v.lengthSquared() < 1e-4) v = new Vector(1, 0, 0);
+            p.setVelocity(v.normalize().multiply(c.repousse() * 0.6).setY(0.36));
+        }
         s.dernierCombat = System.currentTimeMillis();
     }
 
-    // ================================================================== projectiles (chaque tic, pour tous les mobs)
+    // ================================================================== effets en modèles animés
+
+    /** Nombre d'effets en modèles posés depuis le démarrage (pour /vmob info et les essais). */
+    static int effetsPoses;
+
+    private static float yaw(Vector d) {
+        return (float) Math.toDegrees(Math.atan2(-d.getX(), d.getZ()));
+    }
+
+    /** Fait apparaître un modèle d'effet le temps d'une animation ; null s'il n'existe pas (on garde alors les particules). */
+    private Modeles.Instance fx(String modele, Location ou, float yaw, String animation, double taille) {
+        if (modele == null || ou == null || plugin.modeles() == null) return null;
+        try {
+            Modeles.Instance i = plugin.modeles().apparition(modele, ou, yaw, animation, (float) taille);
+            if (i != null) effetsPoses++;
+            return i;
+        } catch (Throwable ex) {
+            return null;
+        }
+    }
+
+    private void retirerFx(Modeles.Instance i) {
+        try {
+            if (i != null && i.base() != null && i.base().isValid()) plugin.modeles().retirer(i);
+        } catch (Throwable ignore) { }
+    }
+
+    private static void ajouter(List<Modeles.Instance> l, Modeles.Instance i) {
+        if (i != null) l.add(i);
+    }
+
+    private void retirerMarques(Etat e) {
+        for (Modeles.Instance i : e.marques) retirerFx(i);
+        e.marques.clear();
+    }
+
+    /** Durée (tics) de l'animation « t<tics> » d'une marque : la plus longue qui ne dépasse pas le signal. */
+    static int dureeMarque(int tics) {
+        return tics <= 40 ? Math.max(4, tics - tics % 2) : Math.min(80, tics - tics % 4);
+    }
+
+    /** Durée (tics) de l'animation « d<tics> » d'une flaque : la plus proche de celle demandée. */
+    static int dureeFlaque(int tics) {
+        int mieux = 20;
+        for (int d : new int[] {20, 30, 40, 50, 60, 80, 100, 120, 160, 200}) if (Math.abs(d - tics) < Math.abs(mieux - tics)) mieux = d;
+        return mieux;
+    }
+
+    /** Marque au sol (modèle de 1 bloc de rayon, agrandi) qui se remplit pendant {@code tics}. */
+    private Modeles.Instance marqueFx(Competence c, Location centre, double taille, int tics, float yaw) {
+        return fx(c.effets().marque(), centre, yaw, "t" + dureeMarque(tics), taille);
+    }
+
+    private void flaque(Mobs.Suivi s, Competence c, Location centre) {
+        int n = dureeFlaque(c.flaque());
+        fx(c.effets().flaque(), centre, hasard.nextFloat() * 360, "d" + n, c.rayon());
+        flaques.add(new Flaque(s, c, centre, tic() + n - 5));
+    }
+
+    // ================================================================== allure des joueurs
+
+    private void suivreJoueurs() {
+        allures.keySet().retainAll(parJoueur.keySet());
+        for (UUID u : parJoueur.keySet()) {
+            Player p = Bukkit.getPlayer(u);
+            if (p == null) continue;
+            Location l = p.getLocation();
+            double[] a = allures.get(u);
+            if (a == null) {
+                allures.put(u, new double[] {l.getX(), l.getZ(), 0, 0});
+                continue;
+            }
+            double dx = l.getX() - a[0], dz = l.getZ() - a[1];
+            if (dx * dx + dz * dz > 4) { dx = 0; dz = 0; }   // téléporté
+            a[2] = a[2] * 0.6 + dx * 0.4;
+            a[3] = a[3] * 0.6 + dz * 0.4;
+            a[0] = l.getX();
+            a[1] = l.getZ();
+        }
+    }
+
+    /** Où sera le joueur dans {@code tics} s'il garde son allure (anticipation 0 : où il est ; 7 blocs d'avance au plus). */
+    Location predire(Player p, double tics, double anticipation) {
+        Location l = p.getLocation();
+        double[] a = allures.get(p.getUniqueId());
+        if (a == null || anticipation <= 0) return l;
+        double dx = a[2] * tics * anticipation, dz = a[3] * tics * anticipation;
+        double d = Math.hypot(dx, dz);
+        if (d > 7) { dx *= 7 / d; dz *= 7 / d; }
+        return l.add(dx, 0, dz);
+    }
+
+    // ================================================================== projectiles et flaques (chaque tic, pour tous les mobs)
 
     void ticProjectiles() {
+        suivreJoueurs();
         Iterator<Projectile> it = projectiles.iterator();
         while (it.hasNext()) {
             Projectile pr = it.next();
-            if (!pr.s.e.isValid() || !(pr.s.e instanceof Mob mob)) { it.remove(); continue; }
+            if (!pr.s.e.isValid() || !(pr.s.e instanceof Mob mob)) {
+                retirerFx(pr.fx);
+                retirerFx(pr.marque);
+                it.remove();
+                continue;
+            }
             World w = mob.getWorld();
             pr.t++;
             double f = Math.min(1, (double) pr.t / pr.duree);
-            Vector p = pr.position(f);
-            Location ici = p.toLocation(w);
-            w.spawnParticle(Particle.FLAME, ici, 3, 0.06, 0.06, 0.06, 0.005);
-            w.spawnParticle(Particle.DUST, ici, 2, 0.05, 0.05, 0.05, 0, new Particle.DustOptions(Color.fromRGB(pr.c.couleur()), 1.3f));
-            if (pr.t % 3 == 0) w.spawnParticle(Particle.FALLING_LAVA, ici, 1, 0.05, 0.05, 0.05, 0);
-            if (pr.t % 2 == 0) cercle(w, pr.arrivee.toLocation(w), pr.c.rayon(), pr.c.couleur(), f);
+            Location ici = pr.position(f).toLocation(w);
+            if (pr.fx != null && pr.fx.base() != null && pr.fx.base().isValid()) {
+                Location lf = ici.clone();
+                lf.setYaw(pr.fx.base().getLocation().getYaw());
+                pr.fx.base().teleport(lf);
+            } else {
+                w.spawnParticle(Particle.FLAME, ici, 3, 0.06, 0.06, 0.06, 0.005);
+                w.spawnParticle(Particle.DUST, ici, 2, 0.05, 0.05, 0.05, 0, new Particle.DustOptions(Color.fromRGB(pr.c.couleur()), 1.3f));
+            }
+            if (pr.marque == null && pr.t % 2 == 0) cercle(w, pr.arrivee.toLocation(w), pr.c.rayon(), pr.c.couleur(), f);
             boolean mur = f > 0.25 && f < 1 && !w.getBlockAt(ici).isPassable();
-            if (f >= 1 || mur) {
-                it.remove();
-                Location impact = mur ? ici : pr.arrivee.toLocation(w);
-                w.spawnParticle(Particle.LAVA, impact, 10, pr.c.rayon() * 0.4, 0.2, pr.c.rayon() * 0.4, 0);
-                w.spawnParticle(Particle.FLAME, impact, 24, pr.c.rayon() * 0.5, 0.15, pr.c.rayon() * 0.5, 0.03);
-                w.spawnParticle(Particle.LARGE_SMOKE, impact, 6, 0.4, 0.2, 0.4, 0.01);
-                w.playSound(impact, Sound.BLOCK_LAVA_POP, 1f, 0.9f);
+            // touche de plein fouet un joueur sur sa route
+            boolean direct = false;
+            if (f > 0.15 && f < 1) {
                 for (Player j : w.getPlayers()) {
                     if (!valide(j, mob)) continue;
                     Location jl = j.getLocation();
-                    if (Geometrie.distance(jl.getX(), jl.getZ(), impact.getX(), impact.getZ()) <= pr.c.rayon() + 0.35
-                        && Math.abs(jl.getY() - impact.getY()) < 2.2) toucher(pr.s, mob, pr.c, j);
+                    if (Math.abs(jl.getX() - ici.getX()) < 0.75 && Math.abs(jl.getZ() - ici.getZ()) < 0.75
+                        && ici.getY() > jl.getY() - 0.3 && ici.getY() < jl.getY() + 2.1) { direct = true; break; }
                 }
+            }
+            if (f >= 1 || mur || direct) {
+                it.remove();
+                impact(pr, mob, f >= 1 ? pr.arrivee.toLocation(w) : ici);
+            }
+        }
+        if (flaques.isEmpty()) return;
+        long t = tic();
+        Iterator<Flaque> fi = flaques.iterator();
+        while (fi.hasNext()) {
+            Flaque fl = fi.next();
+            if (t >= fl.fin || !fl.s.e.isValid() || !(fl.s.e instanceof Mob mob) || mob.isDead()) { fi.remove(); continue; }
+            World w = fl.centre.getWorld();
+            if (fl.c.effets().flaque() == null && t % 4 == 0) {
+                w.spawnParticle(Particle.FLAME, fl.centre, (int) Math.max(3, fl.c.rayon() * 3), fl.c.rayon() * 0.45, 0.05, fl.c.rayon() * 0.45, 0.005);
+            }
+            for (Player j : w.getPlayers()) {
+                if (!valide(j, mob)) continue;
+                Location jl = j.getLocation();
+                if (Geometrie.distance(jl.getX(), jl.getZ(), fl.centre.getX(), fl.centre.getZ()) > fl.c.rayon() * 0.85
+                    || Math.abs(jl.getY() - fl.centre.getY()) > 1.5) continue;
+                if (t - fl.touches.getOrDefault(j.getUniqueId(), -100L) < 10) continue;
+                fl.touches.put(j.getUniqueId(), t);
+                toucher(fl.s, mob, fl.c, j, fl.c.flaqueMult());
             }
         }
     }
 
+    private void impact(Projectile pr, Mob mob, Location ou) {
+        Competence c = pr.c;
+        World w = ou.getWorld();
+        retirerFx(pr.fx);
+        retirerFx(pr.marque);
+        Location bas = sol(ou);
+        if (fx(c.effets().impact(), bas, hasard.nextFloat() * 360, "impact", c.rayon()) == null) {
+            w.spawnParticle(Particle.LAVA, ou, 10, c.rayon() * 0.4, 0.2, c.rayon() * 0.4, 0);
+            w.spawnParticle(Particle.FLAME, ou, 24, c.rayon() * 0.5, 0.15, c.rayon() * 0.5, 0.03);
+            w.spawnParticle(Particle.LARGE_SMOKE, ou, 6, 0.4, 0.2, 0.4, 0.01);
+        }
+        w.playSound(ou, Sound.BLOCK_LAVA_POP, 1f, 0.9f);
+        for (Player j : w.getPlayers()) {
+            if (!valide(j, mob)) continue;
+            Location jl = j.getLocation();
+            if (Geometrie.distance(jl.getX(), jl.getZ(), ou.getX(), ou.getZ()) <= c.rayon() + 0.35
+                && Math.abs(jl.getY() - bas.getY()) < 2.6) toucher(pr.s, mob, c, j, 1);
+        }
+        if (c.flaque() > 0) flaque(pr.s, c, bas);
+    }
+
     void vider() {
+        for (Projectile pr : projectiles) { retirerFx(pr.fx); retirerFx(pr.marque); }
         projectiles.clear();
-        for (Mobs.Suivi s : mobs.suivis()) if (s.ia != null) cacherBarre(s);
+        flaques.clear();
+        for (Mobs.Suivi s : mobs.suivis()) if (s.ia != null) { cacherBarre(s); retirerMarques(s.ia); }
         parJoueur.clear();
+        allures.clear();
+    }
+
+    /** Un coup reçu d'un joueur (pour savoir s'il est pressé). */
+    void coupRecu(Mobs.Suivi s, Player p) {
+        if (s.ia == null) return;
+        s.ia.coups.addLast(tic());
+        while (s.ia.coups.size() > 8) s.ia.coups.removeFirst();
     }
 
     // ================================================================== zones marquées
@@ -930,13 +1231,12 @@ final class IACombat {
     private void barre(Mobs.Suivi s, Mob mob) {
         if (!aBarre(s)) return;
         Etat e = s.ia;
-        Combat.Rang r = s.d.combat().rang();
-        Component titre = Messages.mini(r.couleur() + r.marque() + nom(s) + " <gray>Nv." + s.niveau + (e.enrage ? " <dark_red>· rage" : ""));
+        Component titre = titreBoss(s);
         float p = (float) Math.max(0, Math.min(1, s.vie / Math.max(1, s.vieMax)));
         if (e.barre == null) {
-            e.barre = BossBar.bossBar(titre, p, r == Combat.Rang.ELITE_PP ? BossBar.Color.PURPLE : BossBar.Color.RED, BossBar.Overlay.NOTCHED_10);
+            e.barre = BossBar.bossBar(titre, p, BossBar.Color.RED, BossBar.Overlay.PROGRESS);
         } else {
-            e.barre.name(titre);
+            if (!titre.equals(e.barre.name())) e.barre.name(titre);
             e.barre.progress(p);
         }
         Set<UUID> voient = new HashSet<>();
@@ -954,6 +1254,49 @@ final class IACombat {
         }
     }
 
+    /** Largeur (pixels) d'une couche de la barre de boss : deux moitiés de 96 px (avance 97) collées. */
+    static final int LARGEUR_BOSS = 193;
+    private static final int PALIERS_BOSS = 88;
+    private Boolean glyphesBoss;
+
+    private static String couche(String nom, String gauche, String droite) {
+        return "<glyphe:vmob_boss_" + nom + "_g" + gauche + "><decalage:-1><glyphe:vmob_boss_" + nom + "_d" + droite + ">";
+    }
+
+    /** Glyphes de la barre de boss : cadre du rang (avec son fond), traîne, Vie, superposés. */
+    static String barreBoss(double vie, double traine, double vieMax, Combat.Rang rang) {
+        int v = vie <= 0 || vieMax <= 0 ? 0 : Math.max(1, Math.min(PALIERS_BOSS, (int) Math.round(PALIERS_BOSS * vie / vieMax)));
+        int t = Math.max(v, vieMax <= 0 ? 0 : Math.min(PALIERS_BOSS, (int) Math.round(PALIERS_BOSS * traine / vieMax)));
+        int m = PALIERS_BOSS / 2;
+        String retour = "<decalage:-" + LARGEUR_BOSS + ">";
+        return "<white>" + couche("cadre_" + Combats.cadre(rang), "", "") + retour
+            + couche("traine", String.format("_%02d", Math.min(m, t)), String.format("_%02d", Math.max(0, t - m))) + retour
+            + couche("vie", String.format("_%02d", Math.min(m, v)), String.format("_%02d", Math.max(0, v - m)));
+    }
+
+    /**
+     * Titre de la barre de boss : la barre dessinée (glyphes sans ombre, par-dessus la barre du jeu) et, centré au-dessus,
+     * le nom et le niveau. Sans les glyphes (Vorace pas encore redémarré) : le nom seul, sur la barre du jeu.
+     */
+    private Component titreBoss(Mobs.Suivi s) {
+        Combat.Rang r = s.d.combat().rang();
+        String nom = s.d.nom() != null ? s.d.nom() : s.d.id();
+        String suite = " Nv." + s.niveau + (s.ia.enrage ? " · rage" : "");
+        Component texte = Messages.mini(r.couleur() + Messages.echapper(nom) + "<#c9c1b4> Nv." + s.niveau + (s.ia.enrage ? " <red>· rage" : ""));
+        if (glyphesBoss == null) {
+            try { glyphesBoss = fr.vorace.api.VoraceAPI.glyphe("vmob_boss_vie_g_00") != null; } catch (Throwable ex) { glyphesBoss = false; }
+        }
+        if (!glyphesBoss) return texte;
+        int n = Largeur.de(nom + suite), debut = (LARGEUR_BOSS - n) / 2;
+        Component barre = Messages.mini(barreBoss(s.vie, Math.max(s.vie, s.vieTraine), s.vieMax, r) + decalage(debut - LARGEUR_BOSS))
+            .shadowColor(net.kyori.adventure.text.format.ShadowColor.none());
+        return Component.textOfChildren(barre, texte, Messages.mini(decalage(LARGEUR_BOSS - debut - n)));
+    }
+
+    private static String decalage(int px) {
+        return px == 0 ? "" : "<decalage:" + px + ">";
+    }
+
     void cacherBarre(Mobs.Suivi s) {
         if (s.ia == null || s.ia.barre == null) return;
         for (UUID u : s.ia.spectateurs) { Player j = Bukkit.getPlayer(u); if (j != null) j.hideBossBar(s.ia.barre); }
@@ -965,7 +1308,10 @@ final class IACombat {
         if (s.ia == null) return;
         cacherBarre(s);
         desinscrire(s);
+        retirerMarques(s.ia);
+        for (Projectile pr : projectiles) if (pr.s == s) { retirerFx(pr.fx); retirerFx(pr.marque); }
         projectiles.removeIf(p -> p.s == s);
+        flaques.removeIf(f -> f.s == s);
     }
 
     /** Pour /vmob menace. */

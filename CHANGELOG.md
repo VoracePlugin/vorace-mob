@@ -1,5 +1,29 @@
 # Journal des changements
 
+## 1.5.0 (novembre 2026) : retours de l'essai du cerveau de combat
+
+- **Plus de nom au-dessus des mobs**, seulement leur barre de vie, en combat (`combat.nom-visible: true` pour le nom et
+  le niveau). Le nom reste sur la barre de boss des élites ++ et des boss.
+- **Barre de vie refaite** : quatre affichages d'objets tournés vers le joueur (cadre sombre, or, violet ou rouge selon le
+  rang, Vie, traîne des derniers dégâts, vide), toujours éclairés, qui chevauchent le mob. La Vie et la traîne glissent.
+  Plus de fond gris ni de texte : la barre ne se perd plus derrière les flammes d'un modèle.
+- **Vraie barre de boss** : barre dessinée (cadre du rang, Vie, traîne) par-dessus celle du jeu, nom et niveau centrés
+  au-dessus.
+- **Effets des attaques en modèles animés** (`effets:` d'une attaque : `marque`, `projectile`, `impact`, `pluie`,
+  `flaque`) à la place des particules ; les modèles d'exemple `fx_cire_marque`, `fx_cire_dalle`, `fx_cire_goutte`,
+  `fx_cire_impact`, `fx_cire_pluie`, `fx_cire_flaque` sont installés dans `plugins/Vorace/modeles-animes`.
+- **Attaques plus dures** :
+  - projectiles : `vitesse` (blocs par tic), `anticipation` (il vise où la cible sera), touche de plein fouet un joueur
+    sur sa route, `salve` et `intervalle` (2e tir plus loin sur la route, 3e sur la cible), `depart` en liste ;
+  - zones : `zones` et `dispersion` (plusieurs cercles : sur la cible, sur sa route, autour) ;
+  - `flaque` : l'impact laisse une flaque brûlante (un coup à `flaque-multiplicateur` toutes les 10 tics) ;
+  - `repousse` (les joueurs touchés sont repoussés) et `bond` (le mob bondit après son coup, en arrière si négatif) ; une
+    attaque à `bond` négatif passe avant les autres : collé, il se dégage ;
+  - déplacements en combat plus vifs (recul et pas chassés).
+- Exemple `mobs/combat.yml` refait (l'ancien est gardé en `combat.yml.ancien`) : Goutte ardente rapide, Salve ardente,
+  Pluie de suif à trois cercles, Éclaboussure avec bond en arrière.
+- Un mob invoqué à un niveau au-dessus de son niveau de base apparaît avec toute sa Vie.
+
 ## 1.4.0 (novembre 2026) : cerveau de combat
 
 Retours de l'essai de la 1.3.0 :

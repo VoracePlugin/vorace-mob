@@ -20,7 +20,8 @@ import java.util.Map;
  *   rang: normal         # normal, elite, elite++, mini-boss ou boss
  *   type: Fire           # type d'attaque de son coup de base (libre, lu par le plugin du combat)
  *   magique: false       # coup de base magique (Puissance magique) ou physique
- *   barre: true          # nom, niveau et barre de vie au-dessus du mob
+ *   barre: true          # barre de vie au-dessus du mob, en combat
+ *   nom-visible: false   # vrai : nom et niveau au-dessus du mob (par défaut, seulement sa barre de vie)
  *   stats: { resistance: 12, armure: 3, res_mag: 0, puissance_phys: 75, puissance_mag: 66, crit: 0.03, esquive: 0.02 }
  * </pre>
  *
@@ -35,7 +36,8 @@ import java.util.Map;
  */
 public record Combat(int niveauMin, int niveauMax, double vie, Rang rang, String type, boolean magique, boolean barre,
                      Map<String, Double> stats, int niveauBase, Map<String, Double> progression, double xp, IA ia,
-                     Competence coupDeBase, List<Competence> competences, List<Lot> butin, List<Phase> phases, int enrage) {
+                     Competence coupDeBase, List<Competence> competences, List<Lot> butin, List<Phase> phases, int enrage,
+                     boolean nomVisible) {
 
     /** Valeurs reprises par les attaques qui ne les écrivent pas. */
     record Defauts(String type, boolean magique) {}
@@ -263,7 +265,7 @@ public record Combat(int niveauMin, int niveauMax, double vie, Rang rang, String
         phases.sort((x, y) -> Double.compare(y.seuil(), x.seuil()));
         return new Combat(nMin, nMax, vie, rang, type, magique, s.getBoolean("barre", true), Map.copyOf(stats),
             s.getInt("niveau-base", nMin), Map.copyOf(prog), Math.max(0, s.getDouble("xp", 0)), ia, base, List.copyOf(comps),
-            List.copyOf(butin), List.copyOf(phases), Math.max(0, s.getInt("enrage", 0)));
+            List.copyOf(butin), List.copyOf(phases), Math.max(0, s.getInt("enrage", 0)), s.getBoolean("nom-visible", false));
     }
 
     /**

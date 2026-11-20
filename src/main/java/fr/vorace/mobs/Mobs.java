@@ -87,6 +87,12 @@ public final class Mobs {
         butin = new Butin(plugin);
     }
 
+    /** Monté par un joueur ou un autre mob (les affichages de la barre de vie, passagers eux aussi, ne comptent pas). */
+    static boolean monte(Entity e) {
+        for (Entity p : e.getPassengers()) if (!(p instanceof org.bukkit.entity.Display)) return true;
+        return false;
+    }
+
     /** Vie, niveau et barre des mobs de combat. */
     Combats combats() { return combats; }
     /** Cerveau de combat (menace, déplacements, attaques). */
@@ -179,6 +185,7 @@ public final class Mobs {
     public void arreter() {
         if (tache != null) tache.cancel();
         try { ia.vider(); } catch (Throwable ignore) { }
+        try { combats.vider(); } catch (Throwable ignore) { }
         for (Suivi s : suivis.values()) sauverBesoins(s);
         sauverRegistre();
     }
@@ -221,6 +228,8 @@ public final class Mobs {
         double vitesseBase, vieTraine;
         long traineDepuis;
         UUID etiquette;
+        /** Barre de vie : dernières proportions posées (Vie, traîne) et hauteur au-dessus du mob. */
+        float barreV = -1, barreT = -1, barreY;
 
         Suivi(Entity e, DefinitionMob d) {
             this.e = e;
@@ -452,7 +461,8 @@ public final class Mobs {
         if (apparition != null) pdc.set(cleApparition, PersistentDataType.STRING, apparition);
         if (d.combattant()) {
             int n = niveau > 0 ? niveau : d.combat().tirerNiveau(hasard.nextDouble());
-            pdc.set(combats.cle(), PersistentDataType.STRING, String.format(Locale.ROOT, "%.2f;%d", d.combat().vie(), n));
+            // Vie pleine à son niveau (un niveau au-dessus du niveau de base a plus de Vie)
+            pdc.set(combats.cle(), PersistentDataType.STRING, String.format(Locale.ROOT, "%.2f;%d", d.combat().vieAuNiveau(n), n));
         }
         charger(List.of(e));
         return e;
@@ -673,7 +683,7 @@ public final class Mobs {
         if (proche == null) return; // personne autour : il ne réfléchit pas
         if (!(e instanceof Mob mob)) return;
         // monté par un joueur ou tenu en laisse : c'est le joueur qui décide
-        if (!e.getPassengers().isEmpty() || (e instanceof LivingEntity le && le.isLeashed())) return;
+        if (monte(e) || (e instanceof LivingEntity le && le.isLeashed())) return;
         // mob de combat : en combat (ou s'il voit un joueur), c'est le cerveau de combat qui le mène
         if (s.d.combattant() && ia.penser(s)) return;
         double distMaison = Geometrie.distance(l.getX(), l.getZ(), s.mx, s.mz);
@@ -1113,6 +1123,15 @@ public final class Mobs {
                     faits.remove("combat");
                 }
                 faits.add("combat-ia");
+                change = true;
+            }
+            // l'exemple de la 1.4.0 (sans effets en modèles, attaques lentes) : mis de côté (combat.yml.ancien), remplacé
+            if (!faits.contains("combat-effets")) {
+                if (Files.isRegularFile(ancienCombat) && !Files.readString(ancienCombat).contains("effets:")) {
+                    Files.move(ancienCombat, ancienCombat.resolveSibling("combat.yml.ancien"), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                    faits.remove("combat");
+                }
+                faits.add("combat-effets");
                 change = true;
             }
             for (Map.Entry<String, List<String>> lot : lots.entrySet()) {

@@ -303,13 +303,23 @@ public final class TestMobs {
         // cerveau de combat : attaques, IA, butin, progression, phases
         Combat cm = meche.combat();
         Competence goutte = cm.competence("goutte_ardente"), pluie = cm.competence("pluie_de_suif");
-        verifier(cm.competences().size() == 2 && goutte != null && goutte.forme() == Competence.Forme.PROJECTILE && goutte.porteeMin() == 6
-            && goutte.porteeMax() == 14 && goutte.signal() == 14 && goutte.recharge() == 40 && "g_flame_r".equals(goutte.depart())
-            && goutte.magique() && goutte.type().equals("Fire") && goutte.couleur() == 0xFF7A1A, "Goutte ardente lue (projectile 6-14, signal 14)");
-        verifier(pluie != null && pluie.forme() == Competence.Forme.ZONE && pluie.rayon() == 3 && pluie.signal() == 26 && pluie.actif() == 6
-            && pluie.total() == 62 && pluie.duree() == 3 && pluie.couleur() == 0xFFB04A, "Pluie de suif lue (zone r 3, 62 tics)");
-        verifier(cm.coupDeBase() != null && cm.coupDeBase().forme() == Competence.Forme.CONTACT && cm.coupDeBase().signal() == 9
-            && !cm.coupDeBase().magique() && cm.coupDeBase().type().equals("Impact") && cm.coupDeBase().animation() == null, "coup de base au contact, signal 9");
+        Competence salve = cm.competence("salve_ardente"), eclab = cm.competence("eclaboussure");
+        verifier(cm.competences().size() == 4 && goutte != null && goutte.forme() == Competence.Forme.PROJECTILE && goutte.porteeMin() == 3.5
+            && goutte.porteeMax() == 16 && goutte.signal() == 8 && goutte.recharge() == 28 && "g_flame_r".equals(goutte.depart(0))
+            && goutte.magique() && goutte.type().equals("Fire") && goutte.couleur() == 0xFF7A1A && goutte.vitesse() == 1.1
+            && goutte.anticipation() == 0.85 && goutte.total() == 14 && "fx_cire_goutte".equals(goutte.effets().projectile())
+            && goutte.effets().flaque() == null, "Goutte ardente lue (projectile rapide, anticipation, effets)");
+        verifier(salve != null && salve.salve() == 3 && salve.intervalle() == 5 && salve.total() == 27 && "g_flame_l".equals(salve.depart(1))
+            && "g_flame_c".equals(salve.depart(2)) && "g_flame_r".equals(salve.depart(3)) && salve.flaque() == 50 && salve.flaqueMult() == 0.25,
+            "Salve ardente lue (3 tirs, 27 tics, un os par tir, flaques)");
+        verifier(pluie != null && pluie.forme() == Competence.Forme.ZONE && pluie.rayon() == 2.6 && pluie.signal() == 18 && pluie.zones() == 3
+            && pluie.dispersion() == 4 && pluie.total() == 43 && pluie.duree() == 3 && "fx_cire_pluie".equals(pluie.effets().pluie()),
+            "Pluie de suif lue (3 zones, 43 tics)");
+        verifier(eclab != null && eclab.forme() == Competence.Forme.CERCLE && eclab.porteeMax() == 2.6 && eclab.repousse() == 1.3
+            && eclab.bond() == -5.5 && eclab.total() == 16, "Éclaboussure lue (cercle, repousse, bond en arrière)");
+        verifier(cm.coupDeBase() != null && cm.coupDeBase().forme() == Competence.Forme.CONTACT && cm.coupDeBase().signal() == 8
+            && !cm.coupDeBase().magique() && cm.coupDeBase().type().equals("Impact") && cm.coupDeBase().animation() == null
+            && cm.coupDeBase().effets().marque() == null && !cm.nomVisible(), "coup de base au contact, signal 8 ; pas de nom affiché");
         verifier(cm.ia().distance() && cm.ia().distMin() == 6 && cm.ia().distMax() == 11 && cm.ia().aggro() == 14 && cm.ia().laisse() == 28, "IA à distance 6-11");
         verifier(cm.butin().size() == 2 && cm.butin().get(0).objet().equals("vorace:cristal_bleu_nuit") && cm.butin().get(0).min() == 1
             && cm.butin().get(0).max() == 2 && cm.butin().get(1).chance() == 0.25 && cm.xp() == 40, "butin et XP lus");
@@ -331,11 +341,35 @@ public final class TestMobs {
         java.util.UUID ja = java.util.UUID.randomUUID(), jb = java.util.UUID.randomUUID(), jc = java.util.UUID.randomUUID();
         dg.put(ja, 120.0); dg.put(jb, 100.0); dg.put(jc, 110.0);
         verifier(ja.equals(Butin.gagnant(dg)) && Butin.gagnant(java.util.Map.of()) == null, "butin : personne à 50,01 % → celui qui a fait le plus");
-        verifier(Combats.palier(165, 330) == 25 && Combats.palier(1, 330) == 1 && Combats.palier(0, 330) == 0 && Combats.palier(330, 330) == 50,
-            "barre : 50 paliers, 1 au moins tant qu'il vit");
-        String bg = Combats.barreGlyphes(165, 200, 330, Combat.Rang.ELITE);
-        verifier(bg.contains("<glyphe:vmob_vie_25>") && bg.contains("<glyphe:vmob_traine_30>") && bg.contains("vmob_cadre_elite>")
-            && bg.split("decalage:-51", -1).length == 4, "barre en glyphes : fond, traîne, Vie, cadre superposés");
+        float[][] mo = Combats.morceaux(165, 198, 330);
+        verifier(Math.abs(mo[0][1] - Combats.INT_L * 0.5f) < 1e-5 && Math.abs(mo[1][1] - Combats.INT_L * 0.1f) < 1e-5 && Math.abs(mo[2][1] - Combats.INT_L * 0.4f) < 1e-5
+            && Math.abs(mo[0][0] + Combats.INT_L * 0.25f) < 1e-5 && Math.abs(mo[2][0] - Combats.INT_L * 0.3f) < 1e-5
+            && Math.abs(mo[0][1] + mo[1][1] + mo[2][1] - Combats.INT_L) < 1e-5, "barre : Vie, traîne et vide côte à côte, sans recouvrement");
+        verifier(Combats.morceaux(1, 1, 330)[0][1] > 0.02f && Combats.morceaux(0, 0, 330)[0][1] == 0, "barre : toujours un peu de rouge tant qu'il vit");
+        String bb = IACombat.barreBoss(1600, 2000, 3200, Combat.Rang.ELITE_PP);
+        verifier(bb.contains("<glyphe:vmob_boss_cadre_elite_pp_g><decalage:-1><glyphe:vmob_boss_cadre_elite_pp_d>")
+            && bb.contains("<glyphe:vmob_boss_vie_g_44><decalage:-1><glyphe:vmob_boss_vie_d_00>")
+            && bb.contains("<glyphe:vmob_boss_traine_g_44><decalage:-1><glyphe:vmob_boss_traine_d_11>")
+            && bb.split("decalage:-193", -1).length == 3, "barre de boss : cadre, traîne, Vie en deux moitiés");
+        verifier(IACombat.barreBoss(1, 1, 3200, Combat.Rang.BOSS).contains("vmob_boss_vie_g_01") && IACombat.barreBoss(3200, 3200, 3200, Combat.Rang.BOSS).contains("vmob_boss_vie_d_44"),
+            "barre de boss : pleine, et un palier au moins tant qu'il vit");
+        verifier(IACombat.dureeMarque(9) == 8 && IACombat.dureeMarque(18) == 18 && IACombat.dureeMarque(47) == 44 && IACombat.dureeMarque(3) == 4
+            && IACombat.dureeFlaque(50) == 50 && IACombat.dureeFlaque(70) == 60 && IACombat.dureeFlaque(500) == 200, "durées des animations de marque et de flaque");
+        verifier(Largeur.de("Grande Mèche Nv.10") == 100, "largeur d'un nom");
+        // les effets et les images installés dans Vorace existent bien dans le jar
+        String inst;
+        try (InputStream in = TestMobs.class.getClassLoader().getResourceAsStream("installation.txt")) {
+            inst = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        }
+        int absents = 0, lignes = 0;
+        for (String ligne : inst.split("\n")) {
+            String[] x = ligne.trim().split(" ");
+            if (x.length != 2) continue;
+            lignes++;
+            if (TestMobs.class.getClassLoader().getResource(x[0]) == null) { absents++; System.out.println("  absent : " + x[0]); }
+        }
+        verifier(lignes > 190 && absents == 0 && inst.contains("modeles-animes/fx_cire_goutte.bbmodel") && inst.contains("objets/vorace-mob-barre.yml"),
+            "installation.txt : " + lignes + " fichiers, tous dans le jar");
 
         System.out.println(echecs == 0 ? "TOUS LES TESTS PASSENT" : echecs + " ECHEC(S)");
         System.exit(echecs == 0 ? 0 : 1);

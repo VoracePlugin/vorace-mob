@@ -2,22 +2,35 @@ package fr.vorace.mobs;
 
 import fr.vorace.Messages;
 import fr.vorace.api.VoraceAPI;
+import fr.vorace.modeles.ModeleBB;
+import fr.vorace.modeles.Modeles;
 import org.bukkit.Bukkit;
 import org.bukkit.Color;
+import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
 import org.bukkit.attribute.AttributeInstance;
+import org.bukkit.entity.Display;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.ItemDisplay;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Projectile;
 import org.bukkit.entity.TextDisplay;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.scoreboard.Scoreboard;
 import org.bukkit.scoreboard.Team;
+import org.bukkit.util.Transformation;
+import org.joml.Quaternionf;
+import org.joml.Vector3f;
 
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Locale;
+import java.util.Map;
+import java.util.UUID;
 
 /**
  * Vie, niveau et barre des mobs de combat ({@link Combat}). La Vie est gardée par vorace-mob (avec l'entité) ; la
@@ -25,8 +38,9 @@ import java.util.Locale;
  * du plugin du combat passent par {@link #infliger} ; les autres (feu, chute, coup d'un serveur sans plugin de combat)
  * sont convertis : 1 point de santé du jeu = 1 % de la Vie. Les stats suivent le niveau ({@link Combat#stat(String, int)}).
  *
- * <p>Au-dessus du mob : son nom (couleur du rang) et son niveau, et en combat une barre de vie dessinée (glyphes de
- * Vorace installés par vorace-mob : fond, traîne claire des derniers dégâts, Vie, cadre selon le rang).
+ * <p>Au-dessus du mob, en combat seulement : sa <b>barre de vie</b>, faite de quatre affichages d'objets tournés vers
+ * le joueur (cadre selon le rang, Vie, traîne claire des derniers dégâts, vide) qui chevauchent le mob. La Vie et la
+ * traîne glissent (interpolation du jeu). Pas de nom (il est dans le bestiaire), sauf {@code combat.nom-visible: true}.
  */
 final class Combats {
 
@@ -34,14 +48,15 @@ final class Combats {
     static final double SANTE = 100;
     /** Le mob reste « en combat » (barre visible) tant de millisecondes après un coup reçu ou donné. */
     static final long DUREE_COMBAT = 10_000;
-    /** Avance d'un glyphe de la barre (200 px affichés à l'échelle 1/4, + 1). */
-    static final int AVANCE = 51;
-    private static final int PALIERS = 50;
+    /** Barre : largeur et hauteur du cadre et de son intérieur (blocs, à l'échelle 1). */
+    static final float CADRE_L = 1.2f, CADRE_H = 0.2f, INT_L = 1.07f, INT_H = 0.114f;
 
     private final VoraceMob plugin;
     private final Mobs mobs;
     private final NamespacedKey cleVie;
-    private Boolean glyphes;
+    /** mob → ses quatre affichages (cadre, Vie, traîne, vide). */
+    private final Map<UUID, ItemDisplay[]> barres = new HashMap<>();
+    private boolean objetsAbsents;
 
     Combats(VoraceMob plugin, Mobs mobs) {
         this.plugin = plugin;
@@ -105,6 +120,7 @@ final class Combats {
         if (source != null && s.ia != null) {
             s.ia.degats.merge(source.getUniqueId(), reel, Double::sum);
             mobs.ia().ajouterMenace(s, source, reel);
+            mobs.ia().coupRecu(s, source);
         }
         sauver(s);
         afficher(s);
@@ -148,59 +164,156 @@ final class Combats {
         return System.currentTimeMillis() - s.dernierCombat < DUREE_COMBAT || (s.ia != null && s.ia.engage);
     }
 
-    /** Les glyphes de la barre sont-ils chargés par Vorace ? (vérifié une fois) */
-    private boolean glyphes() {
-        if (glyphes == null) {
-            try { glyphes = VoraceAPI.glyphe("vmob_fond") != null && VoraceAPI.glyphe("vmob_vie_" + PALIERS) != null; }
-            catch (Throwable t) { glyphes = false; }
-            if (!glyphes) plugin.getLogger().info("Barre de vie : glyphes pas encore chargés par Vorace (redémarre ou /vorace reload), barre en texte en attendant.");
-        }
-        return glyphes;
+    // ------------------------------------------------------------------ barre au-dessus du mob
+
+    /** Taille de la barre selon le rang. */
+    static float echelle(Combat.Rang r) {
+        return switch (r) {
+            case NORMAL -> 1f;
+            case ELITE -> 1.15f;
+            case ELITE_PP -> 1.35f;
+            default -> 1.6f;
+        };
     }
 
-    /** Texte MiniMessage de la barre : fond, traîne, Vie, cadre superposés (décalages de {@value #AVANCE} px). */
-    static String barreGlyphes(double vie, double traine, double vieMax, Combat.Rang rang) {
-        int v = palier(vie, vieMax), t = Math.max(v, palier(traine, vieMax));
-        String cadre = switch (rang) {
+    static String cadre(Combat.Rang r) {
+        return switch (r) {
             case NORMAL -> "normal";
             case ELITE -> "elite";
             case ELITE_PP -> "elite_pp";
             default -> "boss";
         };
-        String d = "<decalage:-" + AVANCE + ">";
-        return String.format(Locale.ROOT, "<white><glyphe:vmob_fond>%s<glyphe:vmob_traine_%02d>%s<glyphe:vmob_vie_%02d>%s<glyphe:vmob_cadre_%s>",
-            d, t, d, v, d, cadre);
-    }
-
-    /** Palier de remplissage (0 à 50) ; un mob encore en vie a toujours au moins un palier. */
-    static int palier(double vie, double vieMax) {
-        if (vie <= 0 || vieMax <= 0) return 0;
-        return Math.max(1, Math.min(PALIERS, (int) Math.round(PALIERS * vie / vieMax)));
-    }
-
-    /** Nom, niveau et (en combat) barre de vie au-dessus du mob, au point « tag_ » de son modèle. */
-    void afficher(Mobs.Suivi s) {
-        Combat c = s.d.combat();
-        if (c == null || !c.barre() || !s.e.isValid()) return;
-        String nom = s.d.nom() != null ? s.d.nom() : s.d.id();
-        Combat.Rang r = c.rang();
-        String t = r.couleur() + r.marque() + Messages.echapper(nom) + " <#9d968c>Nv." + s.niveau;
-        if (enCombat(s) && s.vie > 0) {
-            t += "\n" + (glyphes() ? barreGlyphes(s.vie, s.vieTraine, s.vieMax, r) : Combat.barre(s.vie, s.vieMax, 20));
-        }
-        // avec un modèle animé, vorace-core affiche le nom à l'os « tag_ » ; sinon le nom du jeu reste visible
-        boolean modele = plugin.modeles() != null && plugin.modeles().instance(s.e) != null;
-        if (modele && !s.dansEquipe) cacherNomDuJeu(s);
-        if (s.e.isCustomNameVisible() == modele) s.e.setCustomNameVisible(!modele);
-        if (modele) etiquette(s);
-        if (t.equals(s.texteNom)) return;
-        s.texteNom = t;
-        s.e.customName(Messages.mini(t));
     }
 
     /**
-     * L'étiquette de vorace-core (un affichage de texte) a un fond gris par défaut : on le rend transparent, sans ombre,
-     * pour que la barre dessinée soit propre.
+     * Les trois morceaux de l'intérieur de la barre, de gauche à droite : Vie de 0 à v, traîne de v à t, vide de t à 1.
+     * Renvoie pour chacun {centre x, largeur} en blocs (échelle 1), sans recouvrement.
+     */
+    static float[][] morceaux(double vie, double traine, double vieMax) {
+        float v = vieMax <= 0 ? 0 : (float) Math.max(0, Math.min(1, vie / vieMax));
+        if (vie > 0) v = Math.max(v, 0.02f);   // encore en vie : toujours un peu de rouge
+        float t = vieMax <= 0 ? 0 : (float) Math.max(v, Math.min(1, traine / vieMax));
+        float g = -INT_L / 2;
+        return new float[][] {
+            {g + INT_L * v / 2, INT_L * v},
+            {g + INT_L * (v + t) / 2, INT_L * (t - v)},
+            {g + INT_L * (t + 1) / 2, INT_L * (1 - t)}};
+    }
+
+    /** Barre de vie (en combat seulement) ; nom et niveau seulement si le mob le demande. */
+    void afficher(Mobs.Suivi s) {
+        Combat c = s.d.combat();
+        if (c == null || !s.e.isValid()) return;
+        boolean modele = plugin.modeles() != null && plugin.modeles().instance(s.e) != null;
+        if (modele && !s.dansEquipe) cacherNomDuJeu(s);
+        if (c.nomVisible()) {
+            String nom = s.d.nom() != null ? s.d.nom() : s.d.id();
+            String t = c.rang().couleur() + c.rang().marque() + Messages.echapper(nom) + " <#9d968c>Nv." + s.niveau;
+            if (s.e.isCustomNameVisible() == modele) s.e.setCustomNameVisible(!modele);
+            if (modele) etiquette(s);
+            if (!t.equals(s.texteNom)) { s.texteNom = t; s.e.customName(Messages.mini(t)); }
+        } else if (s.e.customName() != null) {
+            s.e.customName(null);
+            s.e.setCustomNameVisible(false);
+        }
+        if (!c.barre() || s.vie <= 0 || !enCombat(s)) { retirerBarre(s.e.getUniqueId()); return; }
+        barre(s, c);
+    }
+
+    private void barre(Mobs.Suivi s, Combat c) {
+        ItemDisplay[] b = barres.get(s.e.getUniqueId());
+        float k = echelle(c.rang());
+        if (b == null || !valide(b)) {
+            if (b != null) retirerBarre(s.e.getUniqueId());
+            if (objetsAbsents) return;
+            ItemStack[] objets = {objet("vmob_barre_cadre_" + cadre(c.rang())), objet("vmob_barre_vie"), objet("vmob_barre_traine"), objet("vmob_barre_vide")};
+            for (ItemStack o : objets) {
+                if (o != null) continue;
+                objetsAbsents = true;
+                plugin.getLogger().warning("Barre de vie : objets « vmob_barre_... » absents de Vorace (redémarre le serveur une fois). Pas de barre en attendant.");
+                return;
+            }
+            Location l = s.e.getLocation();
+            l.setYaw(0);
+            l.setPitch(0);
+            b = new ItemDisplay[4];
+            for (int i = 0; i < 4; i++) {
+                final ItemStack o = objets[i];
+                b[i] = l.getWorld().spawn(l, ItemDisplay.class, d -> {
+                    d.setPersistent(false);
+                    d.setItemStack(o);
+                    d.setItemDisplayTransform(ItemDisplay.ItemDisplayTransform.NONE);
+                    d.setBillboard(Display.Billboard.CENTER);
+                    d.setBrightness(new Display.Brightness(15, 15));
+                    d.setViewRange(0.5f);
+                    d.setShadowRadius(0);
+                    d.setTransformation(new Transformation(new Vector3f(0, 0.5f, 0), new Quaternionf(), new Vector3f(0.001f, 0.001f, 0.001f), new Quaternionf()));
+                });
+                s.e.addPassenger(b[i]);
+            }
+            barres.put(s.e.getUniqueId(), b);
+            s.barreV = s.barreT = -1;
+            s.barreY = hauteur(s);
+        }
+        float v = (float) (s.vie / s.vieMax), t = (float) (Math.max(s.vie, s.vieTraine) / s.vieMax);
+        if (Math.abs(v - s.barreV) < 1e-4 && Math.abs(t - s.barreT) < 1e-4) return;
+        boolean premier = s.barreV < 0;
+        s.barreV = v;
+        s.barreT = t;
+        float y = s.barreY;
+        float[][] m = morceaux(s.vie, Math.max(s.vie, s.vieTraine), s.vieMax);
+        poser(b[0], 0, y, 0.004f, CADRE_L * k, CADRE_H * k, premier);
+        for (int i = 0; i < 3; i++) poser(b[i + 1], m[i][0] * k, y, 0, Math.max(0.0001f, m[i][1] * k), INT_H * k, premier);
+    }
+
+    private static void poser(ItemDisplay d, float x, float y, float z, float largeur, float hauteur, boolean premier) {
+        d.setInterpolationDelay(0);
+        d.setInterpolationDuration(premier ? 0 : 3);
+        d.setTransformation(new Transformation(new Vector3f(x, y, z), new Quaternionf(), new Vector3f(largeur, hauteur, 0.02f), new Quaternionf()));
+    }
+
+    private static boolean valide(ItemDisplay[] b) {
+        for (ItemDisplay d : b) if (d == null || !d.isValid() || d.getVehicle() == null) return false;
+        return true;
+    }
+
+    private static ItemStack objet(String id) {
+        try { return VoraceAPI.objet(id, 1); } catch (Throwable e) { return null; }
+    }
+
+    /**
+     * Hauteur de la barre au-dessus du point où chevauchent ses affichages (le haut du mob) : l'os « tag_ » de son modèle
+     * s'il en a un, sinon juste au-dessus de sa tête.
+     */
+    private float hauteur(Mobs.Suivi s) {
+        double haut = s.e.getLocation().getY() + s.e.getHeight();
+        try {
+            Modeles.Instance m = plugin.modeles() == null ? null : plugin.modeles().instance(s.e);
+            if (m != null) {
+                for (ModeleBB.Partie p : m.modele().parties()) {
+                    if (!p.etiquette()) continue;
+                    Location l = m.positionOs(p.nom());
+                    if (l != null) return (float) Math.max(-1, Math.min(8, l.getY() - haut + 0.1));
+                }
+            }
+        } catch (Throwable ignore) { }
+        return 0.35f;
+    }
+
+    private void retirerBarre(UUID mob) {
+        ItemDisplay[] b = barres.remove(mob);
+        if (b == null) return;
+        for (ItemDisplay d : b) if (d != null && d.isValid()) d.remove();
+    }
+
+    /** Arrêt du plugin : plus aucune barre. */
+    void vider() {
+        for (UUID u : new java.util.ArrayList<>(barres.keySet())) retirerBarre(u);
+    }
+
+    /**
+     * Nom visible ({@code combat.nom-visible}) : l'étiquette de vorace-core (un affichage de texte) a un fond gris par
+     * défaut ; on le rend transparent.
      */
     private void etiquette(Mobs.Suivi s) {
         Entity deja = s.etiquette == null ? null : Bukkit.getEntity(s.etiquette);
@@ -210,7 +323,6 @@ final class Combats {
             if (!(x instanceof TextDisplay td) || s.e.customName() == null || !s.e.customName().equals(td.text())) continue;
             td.setBackgroundColor(Color.fromARGB(0, 0, 0, 0));
             td.setDefaultBackground(false);
-            td.setShadowed(false);
             td.setLineWidth(300);
             s.etiquette = td.getUniqueId();
             return;
@@ -221,23 +333,34 @@ final class Combats {
     void tic(Iterable<Mobs.Suivi> suivis, long tic) {
         for (Mobs.Suivi s : suivis) {
             if (!s.d.combattant() || !s.e.isValid()) continue;
-            if (s.vieTraine > s.vie && tic - s.traineDepuis > 12) {
-                s.vieTraine = Math.max(s.vie, s.vieTraine - Math.max(s.vieMax * 0.015, (s.vieTraine - s.vie) * 0.18));
+            if (s.vieTraine > s.vie && tic - s.traineDepuis > 10) {
+                s.vieTraine = Math.max(s.vie, s.vieTraine - Math.max(s.vieMax * 0.02, (s.vieTraine - s.vie) * 0.2));
             }
             if (s.vieTraine > s.vie || tic % 10 == 0) afficher(s);
+        }
+        if (tic % 20 == 0) {
+            // barres orphelines (mob retiré, déchargé) : retirées
+            for (Iterator<Map.Entry<UUID, ItemDisplay[]>> it = barres.entrySet().iterator(); it.hasNext(); ) {
+                Map.Entry<UUID, ItemDisplay[]> x = it.next();
+                Entity mob = Bukkit.getEntity(x.getKey());
+                if (mob != null && mob.isValid() && !mob.isDead() && mobs.suivi(mob) != null) continue;
+                for (ItemDisplay d : x.getValue()) if (d != null && d.isValid()) d.remove();
+                it.remove();
+            }
         }
     }
 
     /** Mort : la barre part avec lui. */
     void mort(Mobs.Suivi s) {
         s.vie = 0;
+        retirerBarre(s.e.getUniqueId());
         Team t = equipe();
         if (t != null) t.removeEntry(s.e.getUniqueId().toString());
     }
 
     /**
      * Un mob avec un modèle est invisible ; le jeu montrerait quand même son nom quand on le vise. Une équipe « jamais
-     * de nom » le cache : seul le nom au-dessus du modèle (vorace-core) reste.
+     * de nom » le cache.
      */
     private void cacherNomDuJeu(Mobs.Suivi s) {
         Team t = equipe();
@@ -263,9 +386,9 @@ final class Combats {
     /** Pour /vmob info. */
     static String etat(Mobs.Suivi s) {
         if (!s.d.combattant()) return "";
-        org.bukkit.entity.Player c = s.ia == null || s.ia.cible == null ? null : Bukkit.getPlayer(s.ia.cible);
+        Player c = s.ia == null || s.ia.cible == null ? null : Bukkit.getPlayer(s.ia.cible);
         String ia = s.ia == null ? "" : String.format(Locale.ROOT, " combat=%s mode=%s attaques=%d", s.ia.engage ? "oui" : s.ia.rentre ? "rentre" : "non",
-            s.ia.mode, s.ia.attaques)
+            s.ia.mode, s.ia.attaques) + " effets=" + IACombat.effetsPoses
             + (c != null && c.getWorld().equals(s.e.getWorld()) ? String.format(Locale.ROOT, " cible=%.1f vue=%s", c.getLocation().distance(s.e.getLocation()),
                 s.e instanceof LivingEntity le && le.hasLineOfSight(c) ? "oui" : "non") : "");
         return String.format(Locale.ROOT, " niveau=%d vie=%.0f/%.0f rang=%s", s.niveau, s.vie, s.vieMax, s.d.combat().rang().nom()) + ia;

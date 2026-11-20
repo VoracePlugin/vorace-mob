@@ -179,6 +179,8 @@ echo "===== Mobs de combat"; grep -a 'mob=cr_' journal.txt | tail -6
 grep -aq 'mob=cr_meche_sourde .*combat=oui' journal.txt || { echo "ECHEC : la Mèche-sourde n'entre pas en combat"; exit 1; }
 grep -aqE 'mob=cr_meche_sourde .*attaques=[1-9]' journal.txt || { echo "ECHEC : la Mèche-sourde n'attaque pas"; exit 1; }
 grep -aqE 'mob=cr_grande_meche .*combat=oui' journal.txt || { echo "ECHEC : la Grande Mèche n'entre pas en combat"; exit 1; }
+grep -aqE 'mob=cr_[a-z_]* .*effets=[1-9]' journal.txt || { echo "ECHEC : aucun effet en modèle 3D posé (fx_cire_...)"; exit 1; }
+if grep -aq 'Mobs : erreur' journal.txt; then echo "ECHEC : erreur dans les mobs"; grep -a -A25 'Mobs : erreur' journal.txt | head -60; exit 1; fi
 MOBS_VUS=$(grep -ao 'mob=[a-z_]* action=[a-z]*' journal.txt | sort -u)
 echo "mobs vus : $MOBS_VUS"
 echo "$MOBS_VUS" | grep -q 'mob=golem_paisible' || { echo "ECHEC : les golems de l'essai ne pensent pas"; exit 1; }
