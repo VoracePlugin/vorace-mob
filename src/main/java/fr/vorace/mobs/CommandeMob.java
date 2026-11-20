@@ -101,7 +101,8 @@ final class CommandeMob implements TabExecutor {
             case "apparitions" -> {
                 for (Apparition ap : m.apparitions()) s.sendMessage(Messages.brut("<white> " + Messages.echapper(ap.id()) + " <gray>: "
                     + m.membres(ap.id()) + "/" + ap.nombre() + " " + Messages.echapper(String.join(", ", ap.mobs())) + " à "
-                    + (int) ap.x() + " " + (int) ap.y() + " " + (int) ap.z() + " (" + Messages.echapper(ap.monde()) + ")"));
+                    + (int) ap.x() + " " + (int) ap.y() + " " + (int) ap.z() + " (" + Messages.echapper(ap.monde()) + ")"
+                    + (ap.niveau() > 0 ? ", niveau " + ap.niveau() : "") + (ap.cycle() > 0 ? ", cycle " + (int) ap.cycle() + " s" : "")));
                 s.sendMessage(Messages.brut("<gray>" + m.apparitions().size() + " point(s) d'apparition."));
             }
             case "retirer" -> {
@@ -109,10 +110,7 @@ final class CommandeMob implements TabExecutor {
                 try { if (a.length > 2) rayon = Double.parseDouble(a[2]); } catch (NumberFormatException ignore) { }
                 Mobs.Suivi x = m.plusProche(ici, rayon);
                 if (x == null) { s.sendMessage(Messages.brut("<yellow>Aucun mob de Vorace à moins de " + (int) rayon + " blocs.")); return; }
-                org.bukkit.entity.Entity e = x.entite();
-                m.mort(e);
-                if (plugin.modeles() != null && plugin.modeles().instance(e) != null) plugin.modeles().retirer(plugin.modeles().instance(e));
-                if (e.isValid()) e.remove();
+                m.retirer(x.entite());
                 s.sendMessage(Messages.brut("<green>Mob retiré."));
             }
             case "point" -> {

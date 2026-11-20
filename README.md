@@ -40,6 +40,11 @@ mouton:
   il prend peur ou se fâche, `ennui` de temps en temps au repos. Marche, course, dégâts et mort restent automatiques.
 - **Points d'apparition** (`apparitions/*.yml`) : une population gardée autour d'un endroit, qui devient la maison
   de ces mobs ; un mob mort est remplacé après un délai. Rien n'apparaît sans joueur à moins de 96 blocs.
+  Avec `niveau: 12`, les mobs de combat du point apparaissent à ce niveau. Avec `cycle: 120`, les mobs morts ne sont
+  plus remplacés un par un : ils reviennent **tous ensemble**, 120 s après la première mort (une vague).
+- **Zone sûre** (`sure: true` dans `zones/*.yml`) : aucun mob de combat n'y apparaît ni n'y entre (s'il y est poussé, il
+  retourne à sa dernière place hors de la zone), et un joueur qui s'y trouve n'est plus une cible ni touché par leurs
+  attaques. Les animaux et les décors y vivent normalement.
 - **Volants** (`vol: oiseau` ou `vol: papillon`, `altitude: [4, 12]`) : de vrais mobs, qu'on peut taper, posés au sol,
   sur un toit ou une branche ; ils s'envolent quand un joueur approche (`envol: 5`, deux fois moins loin s'il est
   accroupi) ou de temps en temps, volent de point en point en virant, puis se posent ailleurs, toujours dans leur laisse.
@@ -99,7 +104,9 @@ dependencies { compileOnly("com.github.VoracePlugin:vorace-mob:<version>") }
 ```
 
 Puis `depend: [VoraceMob]` dans votre plugin.yml. `VoraceMobAPI.invoquerMob("mouton", endroit)`,
-`VoraceMobAPI.actionMob(entite)`, et l'événement `VoraceMobActionEvent`.
+`VoraceMobAPI.invoquerMob("boss", endroit, niveau)` (niveau imposé), `VoraceMobAPI.retirerMob(entite)` (sans butin ni XP),
+`VoraceMobAPI.zoneSure(endroit)`, `VoraceMobAPI.actionMob(entite)`, et les événements `VoraceMobActionEvent` et
+`VoraceMobMortEvent`.
 
 ## Compiler
 

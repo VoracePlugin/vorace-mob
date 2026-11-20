@@ -26,6 +26,27 @@ public final class VoraceMobAPI {
         return m == null ? null : m.invoquer(id, ou, null, null);
     }
 
+    /** Comme {@link #invoquerMob(String, Location)} ; {@code niveau} &gt; 0 impose le niveau d'un mob de combat. */
+    public static Entity invoquerMob(String id, Location ou, int niveau) {
+        Mobs m = mobs();
+        return m == null ? null : m.invoquer(id, ou, null, null, niveau);
+    }
+
+    /** Retire un mob de Vorace sans butin ni XP (barre de vie et modèle compris), comme {@code /vmob retirer}. */
+    public static void retirerMob(Entity e) {
+        Mobs m = mobs();
+        if (m != null) m.retirer(e);
+    }
+
+    /**
+     * Vrai si ce point est dans une zone sûre ({@code sure: true} dans zones/*.yml) : aucun mob de combat n'y apparaît ni
+     * n'y entre, et un joueur qui s'y trouve n'est plus leur cible.
+     */
+    public static boolean zoneSure(Location l) {
+        Mobs m = mobs();
+        return m != null && m.zoneSure(l);
+    }
+
     /** Identifiant du mob de cette entité, ou null si ce n'est pas un mob de vorace-mob. */
     public static String mobVorace(Entity e) {
         Mobs m = mobs();

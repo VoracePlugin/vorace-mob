@@ -1,5 +1,18 @@
 # Journal des changements
 
+## 1.6.0 (novembre 2026) : le donjon (zone sûre, niveau et cycle des apparitions)
+
+Pour le plugin du donjon de Babel, mais utile à tout serveur.
+- **Zone sûre** : `sure: true` dans une zone (`zones/*.yml`). Aucun mob de combat n'y apparaît (un point d'apparition
+  ne pose rien dedans) ni n'y entre ; un mob de combat qui s'y retrouve (recul, invocation) retourne à sa dernière
+  place hors de la zone ; un joueur qui s'y trouve n'est plus une cible et n'est pas touché par leurs attaques (contact,
+  zones, projectiles). Les animaux, volants et décors y vivent normalement.
+- **Points d'apparition** : `niveau:` (niveau imposé aux mobs de combat du point) et `cycle:` (en secondes) : au lieu
+  d'un remplacement mob par mob après `reapparition`, tous les mobs manquants reviennent ensemble `cycle` secondes après la
+  première mort. Le cycle repart à zéro au redémarrage du serveur. `/vmob apparitions` les affiche.
+- **API** : `VoraceMobAPI.invoquerMob(id, endroit, niveau)`, `retirerMob(entite)` (sans butin ni XP, barre et modèle
+  retirés) et `zoneSure(endroit)`. `/vmob retirer` passe par la même méthode.
+
 ## 1.5.1 (novembre 2026) : équilibre des groupes
 
 Retour de l'essai de la 1.5.0 : un groupe de trois Mèches-sourdes ne se laissait plus approcher.

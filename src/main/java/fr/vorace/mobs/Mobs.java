@@ -73,6 +73,8 @@ public final class Mobs {
         final Map<UUID, double[]> positions = new HashMap<>();
         long derniereMort;
         boolean rempli;
+        /** Cycle : instant où le premier mob a manqué (0 : rien ne manque). Pas sauvegardé : le cycle repart au redémarrage. */
+        long debutManque;
     }
 
     public Mobs(VoraceMob plugin) {
@@ -107,6 +109,47 @@ public final class Mobs {
     public DefinitionMob definition(String id) { return id == null ? null : definitions.get(id.toLowerCase(Locale.ROOT)); }
     public Collection<Apparition> apparitions() { return apparitions.values(); }
     public Collection<Zone> zones() { return zones.values(); }
+
+    /** Vrai si (x, z) est dans une zone sûre de ce monde : aucun mob de combat n'y apparaît ni n'y entre. */
+    public boolean zoneSure(String monde, double x, double z) {
+        for (Zone zone : zones.values()) if (zone.sure() && zone.monde().equals(monde) && zone.contient(x, z)) return true;
+        return false;
+    }
+
+    public boolean zoneSure(Location l) {
+        return l != null && l.getWorld() != null && zoneSure(l.getWorld().getName(), l.getX(), l.getZ());
+    }
+
+    /** Vrai s'il existe au moins une zone sûre. */
+    private boolean aDesZonesSures() {
+        for (Zone zone : zones.values()) if (zone.sure()) return true;
+        return false;
+    }
+
+    /**
+     * Un mob de combat dans une zone sûre est ramené à sa dernière position vue dehors (sa maison à défaut). Renvoie vrai
+     * s'il vient d'être déplacé.
+     */
+    private boolean chasserDeZoneSure(Suivi s, Location l) {
+        if (!zoneSure(l)) {
+            s.sx = l.getX(); s.sy = l.getY(); s.sz = l.getZ(); s.surConnu = true;
+            return false;
+        }
+        Location retour = s.surConnu ? new Location(l.getWorld(), s.sx, s.sy, s.sz, l.getYaw(), 0)
+            : new Location(l.getWorld(), s.mx, s.my, s.mz, l.getYaw(), 0);
+        if (zoneSure(retour)) return false;         // sa maison est elle-même dans la zone sûre : on ne peut rien pour lui
+        s.e.teleport(retour, org.bukkit.event.player.PlayerTeleportEvent.TeleportCause.PLUGIN,
+            io.papermc.paper.entity.TeleportFlag.EntityState.RETAIN_PASSENGERS);
+        return true;
+    }
+
+    /** Retire un mob sans butin ni XP (barre, modèle, point d'apparition : comme /vmob retirer). */
+    public void retirer(Entity e) {
+        if (e == null) return;
+        mort(e);
+        if (plugin.modeles() != null && plugin.modeles().instance(e) != null) plugin.modeles().retirer(plugin.modeles().instance(e));
+        if (e.isValid()) e.remove();
+    }
     public Collection<Suivi> suivis() { return suivis.values(); }
     public String derniereErreur() { return derniereErreur; }
     public int membres(String apparition) { EtatApparition e = registre.get(apparition); return e == null ? 0 : e.membres.size(); }
@@ -198,6 +241,9 @@ public final class Mobs {
         final DefinitionMob d;
         final Cerveau c;
         double mx, my, mz, laisse;
+        /** Dernière position vue hors d'une zone sûre (mobs de combat). */
+        double sx, sy, sz;
+        boolean surConnu;
         String troupeau, apparition;
         Zone zone;
         Location cible, nourriture, eau;
@@ -515,30 +561,49 @@ public final class Mobs {
                 }
             }
             int manque = a.nombre() - et.membres.size();
-            if (manque <= 0) { et.rempli = true; continue; }
-            if (et.rempli && maintenant - et.derniereMort < a.reapparition() * 1000) continue;
-            int n = et.rempli ? 1 : manque;
+            if (manque <= 0) { et.rempli = true; et.debutManque = 0; continue; }
+            int n;
+            if (a.cycle() > 0 && et.rempli) {
+                // cycle : tous les mobs manquants reviennent ensemble, « cycle » secondes après la première mort
+                if (et.debutManque == 0) et.debutManque = maintenant;
+                if (!a.vagueDue(maintenant, et.debutManque)) continue;
+                n = manque;
+            } else {
+                if (et.rempli && maintenant - et.derniereMort < a.reapparition() * 1000) continue;
+                n = et.rempli ? 1 : manque;
+            }
+            int apparus = 0;
             for (int k = 0; k < n; k++) {
-                Location l = solAutour(w, a.x(), a.y(), a.z(), a.rayon());
                 String mob = a.mobs().get(hasard.nextInt(a.mobs().size()));
-                Entity e = invoquer(mob, l, a.id(), a.troupeau() ? a.id() : null);
+                DefinitionMob dm = definition(mob);
+                // un mob de combat n'apparaît jamais dans une zone sûre
+                Location l = solAutour(w, a.x(), a.y(), a.z(), a.rayon(), dm != null && dm.combattant());
+                if (l == null) continue;
+                Entity e = invoquer(mob, l, a.id(), a.troupeau() ? a.id() : null, a.niveau());
                 if (e == null) continue;
                 et.membres.add(e.getUniqueId());
                 et.positions.put(e.getUniqueId(), new double[]{l.getX(), l.getY(), l.getZ()});
+                apparus++;
             }
+            if (apparus == 0) continue;     // rien posé (zone sûre, mob inconnu) : prochain passage
+            et.debutManque = 0;
             if (et.rempli) et.derniereMort = maintenant;
             et.rempli = true;
             registreModifie = true;
         }
     }
 
-    /** Un endroit au sol au hasard dans le rayon (le centre si rien ne convient). */
-    private Location solAutour(World w, double x, double y, double z, double rayon) {
+    /**
+     * Un endroit au sol au hasard dans le rayon (le centre si rien ne convient).
+     * @param horsZoneSure refuser les endroits d'une zone sûre ; null si aucun ne convient
+     */
+    private Location solAutour(World w, double x, double y, double z, double rayon, boolean horsZoneSure) {
         for (int essai = 0; essai < 10; essai++) {
             double a = hasard.nextDouble() * Math.PI * 2, r = Math.sqrt(hasard.nextDouble()) * rayon;
             Location l = sol(w, x + Math.cos(a) * r, y, z + Math.sin(a) * r, false);
-            if (l != null) return l;
+            if (l != null && !(horsZoneSure && zoneSure(w.getName(), l.getX(), l.getZ()))) return l;
         }
+        if (horsZoneSure && zoneSure(w.getName(), x, z)) return null;
         return new Location(w, x, y, z);
     }
 
@@ -663,6 +728,7 @@ public final class Mobs {
     private void penser(Suivi s, double dt) {
         Entity e = s.e;
         Location l = e.getLocation();
+        if (s.d.combattant() && aDesZonesSures() && chasserDeZoneSure(s, l)) return;
         if (!Double.isNaN(s.avantX)) {
             double pas = Math.hypot(l.getX() - s.avantX, l.getZ() - s.avantZ);
             if (pas < 8) s.parcouru += pas;            // au-delà : téléportation, pas un déplacement

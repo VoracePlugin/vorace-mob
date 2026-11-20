@@ -115,7 +115,7 @@ attendre() { # attendre <motif> <fichier> <secondes>
   for _ in $(seq 1 "$3"); do grep -q "$1" "$2" 2>/dev/null && return 0; sleep 1; done; return 1
 }
 if ! attendre 'Done (' journal.txt 400; then echo "Le serveur n'a pas démarré"; tail -80 journal.txt; exit 1; fi
-node "$OUTILS/essai-bot.mjs" 100 $CLIENT > bot.txt 2>&1 &
+node "$OUTILS/essai-bot.mjs" 150 $CLIENT > bot.txt 2>&1 &
 BOT=$!
 attendre 'BOT CONNECTE' bot.txt 60 || { echo "Le faux joueur ne s'est pas connecté"; cat bot.txt; }
 sleep 2
@@ -157,6 +157,24 @@ cmd "vmob info cr_"
 sleep 5
 cmd "vmob info cr_"
 cmd "vmob menace 32"
+# zone sûre : le faux joueur est dans un cercle de 4 blocs (sure: true) ; les mobs de combat lâchent leur cible. Sans la
+# zone, ils le reprennent pour cible (la preuve que c'est elle qui les arrête).
+mkdir -p plugins/VoraceMob/zones
+cat > plugins/VoraceMob/zones/refuge.yml <<'ZONE'
+refuge: { monde: world, cercle: [1.5, -6.5, 4], sure: true }
+ZONE
+cmd "say ESSAI-ZS-1"
+cmd "vmob recharger"
+sleep 10
+cmd "vmob info cr_"
+sleep 1
+cmd "say ESSAI-ZS-2"
+rm -f plugins/VoraceMob/zones/refuge.yml
+cmd "vmob recharger"
+sleep 10
+cmd "vmob info cr_"
+sleep 1
+cmd "say ESSAI-ZS-3"
 wait $BOT
 sleep 1
 cmd "stop"
@@ -181,6 +199,15 @@ grep -aqE 'mob=cr_meche_sourde .*attaques=[1-9]' journal.txt || { echo "ECHEC : 
 grep -aqE 'mob=cr_grande_meche .*combat=oui' journal.txt || { echo "ECHEC : la Grande Mèche n'entre pas en combat"; exit 1; }
 grep -aqE 'mob=cr_[a-z_]* .*effets=[1-9]' journal.txt || { echo "ECHEC : aucun effet en modèle 3D posé (fx_cire_...)"; exit 1; }
 if grep -aq 'Mobs : erreur' journal.txt; then echo "ECHEC : erreur dans les mobs"; grep -a -A25 'Mobs : erreur' journal.txt | head -60; exit 1; fi
+echo "===== Zone sûre"
+phase() { awk -v a="$1" -v b="$2" 'index($0, a) {d = 1; next} index($0, b) {d = 0} d' journal.txt; }
+DANS_ZONE=$(phase 'ESSAI-ZS-1' 'ESSAI-ZS-2' | grep -a 'mob=cr_')
+SANS_ZONE=$(phase 'ESSAI-ZS-2' 'ESSAI-ZS-3' | grep -a 'mob=cr_')
+echo "dans la zone sûre :"; echo "$DANS_ZONE"
+echo "zone retirée :"; echo "$SANS_ZONE"
+[ -n "$DANS_ZONE" ] || { echo "ECHEC : /vmob info n'a rien affiché pendant l'essai de la zone sûre"; exit 1; }
+echo "$DANS_ZONE" | grep -aq 'combat=oui' && { echo "ECHEC : un mob de combat vise encore le joueur dans la zone sûre"; exit 1; }
+echo "$SANS_ZONE" | grep -aq 'combat=oui' || { echo "ECHEC : zone retirée, les mobs ne reprennent pas le joueur pour cible (l'essai ne prouve rien)"; exit 1; }
 MOBS_VUS=$(grep -ao 'mob=[a-z_]* action=[a-z]*' journal.txt | sort -u)
 echo "mobs vus : $MOBS_VUS"
 echo "$MOBS_VUS" | grep -q 'mob=golem_paisible' || { echo "ECHEC : les golems de l'essai ne pensent pas"; exit 1; }

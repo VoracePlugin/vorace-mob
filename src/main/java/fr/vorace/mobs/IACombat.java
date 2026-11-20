@@ -141,9 +141,14 @@ final class IACombat {
             && p.getGameMode() != GameMode.SPECTATOR && p.getGameMode() != GameMode.CREATIVE;
     }
 
+    /** Cible valable pour ce mob : {@link #valide} et hors d'une zone sûre (elle n'est ni visée ni touchée). */
+    boolean cibleValide(Player p, Entity mob) {
+        return valide(p, mob) && !mobs.zoneSure(p.getLocation());
+    }
+
     /** Ajoute de la menace (et engage le mob s'il ne l'était pas). */
     void ajouterMenace(Mobs.Suivi s, Player p, double montant) {
-        if (s.ia == null || s.ia.rentre || !valide(p, s.e) || s.vie <= 0) return;
+        if (s.ia == null || s.ia.rentre || !cibleValide(p, s.e) || s.vie <= 0) return;
         boolean nouveau = !s.ia.menace.containsKey(p.getUniqueId());
         s.ia.menace.merge(p.getUniqueId(), Math.max(0, montant), Double::sum);
         if (nouveau) inscrire(s, p);
@@ -238,7 +243,7 @@ final class IACombat {
         double best = r * r;
         Location l = s.e.getLocation();
         for (Player p : s.e.getWorld().getPlayers()) {
-            if (!valide(p, s.e) || p.isInvisible()) continue;
+            if (!cibleValide(p, s.e) || p.isInvisible()) continue;
             double d = p.getLocation().distanceSquared(l);
             if (d < best && mob.hasLineOfSight(p)) { best = d; meilleur = p; }
         }
@@ -257,7 +262,7 @@ final class IACombat {
         while (it.hasNext()) {
             Map.Entry<UUID, Double> x = it.next();
             Player p = Bukkit.getPlayer(x.getKey());
-            if (!valide(p, mob) || p.getLocation().distanceSquared(l) > Math.pow(s.d.combat().ia().laisse() * 2, 2)) {
+            if (!cibleValide(p, mob) || p.getLocation().distanceSquared(l) > Math.pow(s.d.combat().ia().laisse() * 2, 2)) {
                 it.remove();
                 LinkedHashSet<UUID> lj = parJoueur.get(x.getKey());
                 if (lj != null) lj.remove(mob.getUniqueId());
@@ -273,7 +278,7 @@ final class IACombat {
         // Provocation : cible forcée
         if (e.provocateur != null) {
             Player p = Bukkit.getPlayer(e.provocateur);
-            if (t < e.provocation && valide(p, mob)) { e.cible = p.getUniqueId(); return p; }
+            if (t < e.provocation && cibleValide(p, mob)) { e.cible = p.getUniqueId(); return p; }
             if (p != null && e.menace.containsKey(p.getUniqueId())) {
                 double max = e.menace.values().stream().mapToDouble(Double::doubleValue).max().orElse(0);
                 e.menace.put(p.getUniqueId(), max * 1.1);
@@ -325,7 +330,7 @@ final class IACombat {
     }
 
     void provoquer(Mobs.Suivi s, Player p, long ms) {
-        if (s.ia == null || !valide(p, s.e)) return;
+        if (s.ia == null || !cibleValide(p, s.e)) return;
         ajouterMenace(s, p, 0);
         s.ia.provocateur = p.getUniqueId();
         s.ia.provocation = tic() + Math.max(1, ms / 50);
@@ -370,7 +375,7 @@ final class IACombat {
 
         // cible, laisse, phases
         Player cible = e.cible == null ? null : Bukkit.getPlayer(e.cible);
-        if (t % 10 == 0 || !valide(cible, mob)) cible = choisirCible(s, mob);
+        if (t % 10 == 0 || !cibleValide(cible, mob)) cible = choisirCible(s, mob);
         double maisonD = Geometrie.distance(mob.getLocation().getX(), mob.getLocation().getZ(), s.mx, s.mz);
         if (cible == null || maisonD > cb.ia().laisse()) { rentrer(s); return; }
         if (t < e.aveugle && e.enCours == null) cible = null;   // aveuglé : il cherche
@@ -751,7 +756,7 @@ final class IACombat {
 
     private Player fixation(Mobs.Suivi s, Mob mob, String regle) {
         List<Player> l = new ArrayList<>();
-        for (UUID u : s.ia.menace.keySet()) { Player p = Bukkit.getPlayer(u); if (valide(p, mob)) l.add(p); }
+        for (UUID u : s.ia.menace.keySet()) { Player p = Bukkit.getPlayer(u); if (cibleValide(p, mob)) l.add(p); }
         if (l.isEmpty()) return null;
         Location ici = mob.getLocation();
         return switch (regle.toLowerCase(java.util.Locale.ROOT)) {
@@ -766,7 +771,7 @@ final class IACombat {
         Competence c = e.enCours;
         long t = tic(), dt = t - e.t0;
         Player vise = Bukkit.getPlayer(e.cibleAttaque);
-        if (!valide(vise, mob)) vise = cible;
+        if (!cibleValide(vise, mob)) vise = cible;
         boolean bond = t < e.bondJusqua;
         if (!bond) arreter(mob);
         // il suit sa cible du regard tant qu'il vise (contact, projectile) ; une zone posée ne bouge plus
@@ -879,7 +884,7 @@ final class IACombat {
                 Set<UUID> touches = new HashSet<>();
                 for (Location centre : s.ia.zones) {
                     for (Player p : w.getPlayers()) {
-                        if (!valide(p, mob) || touches.contains(p.getUniqueId())) continue;
+                        if (!cibleValide(p, mob) || touches.contains(p.getUniqueId())) continue;
                         Location pl = p.getLocation();
                         if (Geometrie.distance(pl.getX(), pl.getZ(), centre.getX(), centre.getZ()) <= c.rayon() + 0.3
                             && Math.abs(pl.getY() - centre.getY()) < 2.5) {
@@ -895,7 +900,7 @@ final class IACombat {
             case CONE -> {
                 double cos = Math.cos(Math.toRadians(c.largeur() / 2));
                 for (Player p : w.getPlayers()) {
-                    if (!valide(p, mob)) continue;
+                    if (!cibleValide(p, mob)) continue;
                     Vector v = p.getLocation().toVector().subtract(l.toVector()).setY(0);
                     double d = v.length();
                     if (d <= c.rayon() && (d < 0.8 || v.normalize().dot(s.ia.direction) >= cos) && Math.abs(p.getLocation().getY() - l.getY()) < 2.5) toucher(s, mob, c, p, 1);
@@ -905,7 +910,7 @@ final class IACombat {
             case LIGNE -> {
                 Vector dir = s.ia.direction;
                 for (Player p : w.getPlayers()) {
-                    if (!valide(p, mob)) continue;
+                    if (!cibleValide(p, mob)) continue;
                     Vector v = p.getLocation().toVector().subtract(l.toVector()).setY(0);
                     double avant = v.dot(dir), cote = Math.abs(v.getX() * -dir.getZ() + v.getZ() * dir.getX());
                     if (avant >= -0.3 && avant <= c.rayon() && cote <= c.largeur() / 2 + 0.3 && Math.abs(p.getLocation().getY() - l.getY()) < 2.5) toucher(s, mob, c, p, 1);
@@ -1082,7 +1087,7 @@ final class IACombat {
             boolean direct = false;
             if (f > 0.15 && f < 1) {
                 for (Player j : w.getPlayers()) {
-                    if (!valide(j, mob)) continue;
+                    if (!cibleValide(j, mob)) continue;
                     Location jl = j.getLocation();
                     if (Math.abs(jl.getX() - ici.getX()) < 0.75 && Math.abs(jl.getZ() - ici.getZ()) < 0.75
                         && ici.getY() > jl.getY() - 0.3 && ici.getY() < jl.getY() + 2.1) { direct = true; break; }
@@ -1104,7 +1109,7 @@ final class IACombat {
                 w.spawnParticle(Particle.FLAME, fl.centre, (int) Math.max(3, fl.c.rayon() * 3), fl.c.rayon() * 0.45, 0.05, fl.c.rayon() * 0.45, 0.005);
             }
             for (Player j : w.getPlayers()) {
-                if (!valide(j, mob)) continue;
+                if (!cibleValide(j, mob)) continue;
                 Location jl = j.getLocation();
                 if (Geometrie.distance(jl.getX(), jl.getZ(), fl.centre.getX(), fl.centre.getZ()) > fl.c.rayon() * 0.85
                     || Math.abs(jl.getY() - fl.centre.getY()) > 1.5) continue;
@@ -1128,7 +1133,7 @@ final class IACombat {
         }
         w.playSound(ou, Sound.BLOCK_LAVA_POP, 1f, 0.9f);
         for (Player j : w.getPlayers()) {
-            if (!valide(j, mob)) continue;
+            if (!cibleValide(j, mob)) continue;
             Location jl = j.getLocation();
             if (Geometrie.distance(jl.getX(), jl.getZ(), ou.getX(), ou.getZ()) <= c.rayon() + 0.35
                 && Math.abs(jl.getY() - bas.getY()) < 2.6) toucher(pr.s, mob, c, j, 1);
