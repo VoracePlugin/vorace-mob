@@ -1134,6 +1134,15 @@ public final class Mobs {
                 faits.add("combat-effets");
                 change = true;
             }
+            // l'exemple de la 1.5.0 (groupes trop durs) : mis de côté (combat.yml.ancien), remplacé
+            if (!faits.contains("combat-equilibre")) {
+                if (Files.isRegularFile(ancienCombat) && !Files.readString(ancienCombat).contains("presse:")) {
+                    Files.move(ancienCombat, ancienCombat.resolveSibling("combat.yml.ancien"), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                    faits.remove("combat");
+                }
+                faits.add("combat-equilibre");
+                change = true;
+            }
             for (Map.Entry<String, List<String>> lot : lots.entrySet()) {
                 if (faits.contains(lot.getKey())) continue;
                 installer(lot.getValue());

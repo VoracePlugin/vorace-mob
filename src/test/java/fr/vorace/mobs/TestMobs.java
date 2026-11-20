@@ -305,22 +305,30 @@ public final class TestMobs {
         Competence goutte = cm.competence("goutte_ardente"), pluie = cm.competence("pluie_de_suif");
         Competence salve = cm.competence("salve_ardente"), eclab = cm.competence("eclaboussure");
         verifier(cm.competences().size() == 4 && goutte != null && goutte.forme() == Competence.Forme.PROJECTILE && goutte.porteeMin() == 3.5
-            && goutte.porteeMax() == 16 && goutte.signal() == 8 && goutte.recharge() == 28 && "g_flame_r".equals(goutte.depart(0))
+            && goutte.porteeMax() == 16 && goutte.signal() == 8 && goutte.recharge() == 40 && "g_flame_r".equals(goutte.depart(0))
             && goutte.magique() && goutte.type().equals("Fire") && goutte.couleur() == 0xFF7A1A && goutte.vitesse() == 1.1
-            && goutte.anticipation() == 0.85 && goutte.total() == 14 && "fx_cire_goutte".equals(goutte.effets().projectile())
+            && goutte.anticipation() == 0.6 && goutte.total() == 14 && !goutte.lourde() && goutte.presse() == 0 && "fx_cire_goutte".equals(goutte.effets().projectile())
             && goutte.effets().flaque() == null, "Goutte ardente lue (projectile rapide, anticipation, effets)");
         verifier(salve != null && salve.salve() == 3 && salve.intervalle() == 5 && salve.total() == 27 && "g_flame_l".equals(salve.depart(1))
-            && "g_flame_c".equals(salve.depart(2)) && "g_flame_r".equals(salve.depart(3)) && salve.flaque() == 50 && salve.flaqueMult() == 0.25,
+            && "g_flame_c".equals(salve.depart(2)) && "g_flame_r".equals(salve.depart(3)) && salve.flaque() == 40 && salve.flaqueMult() == 0.25 && salve.lourde(),
             "Salve ardente lue (3 tirs, 27 tics, un os par tir, flaques)");
-        verifier(pluie != null && pluie.forme() == Competence.Forme.ZONE && pluie.rayon() == 2.6 && pluie.signal() == 18 && pluie.zones() == 3
+        verifier(pluie != null && pluie.forme() == Competence.Forme.ZONE && pluie.rayon() == 2.6 && pluie.signal() == 18 && pluie.zones() == 2
             && pluie.dispersion() == 4 && pluie.total() == 43 && pluie.duree() == 3 && "fx_cire_pluie".equals(pluie.effets().pluie()),
-            "Pluie de suif lue (3 zones, 43 tics)");
-        verifier(eclab != null && eclab.forme() == Competence.Forme.CERCLE && eclab.porteeMax() == 2.6 && eclab.repousse() == 1.3
-            && eclab.bond() == -5.5 && eclab.total() == 16, "Éclaboussure lue (cercle, repousse, bond en arrière)");
+            "Pluie de suif lue (2 zones, 43 tics)");
+        verifier(eclab != null && eclab.forme() == Competence.Forme.CERCLE && eclab.porteeMax() == 2.6 && eclab.repousse() == 0.8
+            && eclab.bond() == -4 && eclab.total() == 21 && eclab.presse() == 2 && eclab.lourde(),
+            "Éclaboussure lue (cercle, repousse, bond en arrière, seulement après 2 coups reçus)");
+        // rythme d'un groupe : une attaque à la fois sur un joueur, une lourde à la fois
+        verifier(IACombat.coupsRecus(List.of(10L, 50L, 100L), 110, 60) == 2 && IACombat.coupsRecus(List.of(), 110, 60) == 0, "coups reçus en 3 s");
+        long[] ry = IACombat.rythmeApres(null, 100, goutte, cm.ia().cadence(), cm.ia().repit());
+        verifier(ry[0] == 124 && ry[1] == 0, "après une Goutte : le groupe attend 24 tics, pas de répit des attaques lourdes");
+        ry = IACombat.rythmeApres(ry, 130, salve, cm.ia().cadence(), cm.ia().repit());
+        verifier(ry[0] == 154 && ry[1] == 130 + 27 + 80, "après une Salve : 80 tics de répit après sa fin avant une autre attaque lourde");
+        verifier(cm.ia().recul() == 0.85 && cm.ia().souffle() == 40, "recul plus lent que la marche, essoufflé après 40 tics");
         verifier(cm.coupDeBase() != null && cm.coupDeBase().forme() == Competence.Forme.CONTACT && cm.coupDeBase().signal() == 8
             && !cm.coupDeBase().magique() && cm.coupDeBase().type().equals("Impact") && cm.coupDeBase().animation() == null
             && cm.coupDeBase().effets().marque() == null && !cm.nomVisible(), "coup de base au contact, signal 8 ; pas de nom affiché");
-        verifier(cm.ia().distance() && cm.ia().distMin() == 6 && cm.ia().distMax() == 11 && cm.ia().aggro() == 14 && cm.ia().laisse() == 28, "IA à distance 6-11");
+        verifier(cm.ia().distance() && cm.ia().distMin() == 5 && cm.ia().distMax() == 11 && cm.ia().aggro() == 14 && cm.ia().laisse() == 28, "IA à distance 5-11");
         verifier(cm.butin().size() == 2 && cm.butin().get(0).objet().equals("vorace:cristal_bleu_nuit") && cm.butin().get(0).min() == 1
             && cm.butin().get(0).max() == 2 && cm.butin().get(1).chance() == 0.25 && cm.xp() == 40, "butin et XP lus");
         verifier(Math.abs(cm.stat("puissance_mag", 12) - 66 * 1.18) < 1e-9 && Math.abs(cm.vieAuNiveau(12) - 429) < 1e-9 && cm.stat("esquive", 12) == 0.02

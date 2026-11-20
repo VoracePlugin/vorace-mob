@@ -38,6 +38,10 @@ import java.util.Locale;
  *   bond: -5                 # après le coup, le mob bondit de 5 blocs (négatif : en arrière, loin de sa cible)
  *   flaque: 60               # l'impact laisse une flaque brûlante de 60 tics (dégâts toutes les 10 tics)
  *   flaque-multiplicateur: 0.25
+ *   presse: 2                # seulement s'il a reçu 2 coups dans les 3 dernières secondes (par défaut 2 pour un bond en
+ *                            # arrière, 0 sinon) : le joueur a le temps de le frapper avant qu'il se dégage
+ *   lourde: true             # attaque lourde : une seule à la fois par joueur dans un groupe (par défaut : salve, plusieurs
+ *                            # zones, flaque, repousse ou bond)
  *   effets:                  # modèles animés (plugins/Vorace/modeles-animes) à la place des particules
  *     marque: fx_cire_marque       # zone annoncée au sol (animations « t<tics> », rayon 1 bloc agrandi au rayon)
  *     projectile: fx_cire_goutte   # animation « vol »
@@ -57,7 +61,8 @@ public record Competence(String id, String nom, String animation, Forme forme, d
                          int actif, int recuperation, int recharge, String alteration, double duree, List<String> departs,
                          int couleur, double poids, String annonce, String fixation, double vieMax, boolean interruptible,
                          int phase, double vitesse, double anticipation, int salve, int intervalle, int zones,
-                         double dispersion, double repousse, double bond, int flaque, double flaqueMult, Effets effets) {
+                         double dispersion, double repousse, double bond, int flaque, double flaqueMult, Effets effets,
+                         int presse, boolean lourde) {
 
     /** Modèles animés des effets d'une attaque (null : particules). */
     public record Effets(String marque, String projectile, String impact, String pluie, String flaque) {
@@ -157,6 +162,9 @@ public record Competence(String id, String nom, String animation, Forme forme, d
             case ZONE, CERCLE -> 3;
             case CONE, LIGNE -> Math.max(3, pMax);
         });
+        int salve = Math.max(1, s.getInt("salve", 1)), zones = Math.max(1, s.getInt("zones", 1)), flaque = Math.max(0, s.getInt("flaque", 0));
+        double repousse = Math.max(0, s.getDouble("repousse", 0)), bond = s.getDouble("bond", 0);
+        boolean lourde = s.getBoolean("lourde", salve > 1 || zones > 1 || flaque > 0 || repousse > 0 || bond != 0);
         return new Competence(id, s.getString("nom", coupDeBase ? "coup de base" : id),
             s.getString("animation", coupDeBase ? null : null), f, Math.max(0, pMin), Math.max(pMin, pMax), Math.max(0, rayon),
             Math.max(0, largeur), type, magique, s.getDouble("multiplicateur", s.getDouble("mult", 1)),
@@ -170,6 +178,7 @@ public record Competence(String id, String nom, String animation, Forme forme, d
             Math.max(0, Math.min(2, s.getDouble("anticipation", f == Forme.PROJECTILE ? 0.7 : 0.8))), Math.max(1, s.getInt("salve", 1)),
             Math.max(1, s.getInt("intervalle", 4)), Math.max(1, s.getInt("zones", 1)), Math.max(0, s.getDouble("dispersion", rayon * 1.4)),
             Math.max(0, s.getDouble("repousse", 0)), s.getDouble("bond", 0), Math.max(0, s.getInt("flaque", 0)),
-            Math.max(0, s.getDouble("flaque-multiplicateur", 0.25)), Effets.lire(s.getConfigurationSection("effets")));
+            Math.max(0, s.getDouble("flaque-multiplicateur", 0.25)), Effets.lire(s.getConfigurationSection("effets")),
+            Math.max(0, s.getInt("presse", bond < 0 ? 2 : 0)), lourde);
     }
 }

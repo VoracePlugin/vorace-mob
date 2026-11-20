@@ -53,9 +53,14 @@ public record Combat(int niveauMin, int niveauMax, double vie, Rang rang, String
      * @param entraide  les mobs du même type à cette distance le rejoignent quand il entre en combat
      * @param vitesse   multiplicateur de ses déplacements en combat
      * @param feinte    chance de se décaler (pas chassés) entre deux attaques, de 0 à 1
+     * @param cadence   à plusieurs sur le même joueur (rangs normal et élite) : tics au moins entre deux débuts d'attaque
+     *                  du groupe sur ce joueur (le coup de base n'est pas compté)
+     * @param repit     à plusieurs : tics au moins entre la fin d'une attaque lourde et la suivante sur ce joueur
+     * @param recul     multiplicateur de sa vitesse quand il recule (distance)
+     * @param souffle   tics de recul d'affilée avant d'être essoufflé : il tient alors sa place une fois et demie ce temps
      */
     public record IA(String role, double aggro, double laisse, double distMin, double distMax, double entraide, double vitesse,
-                     double feinte) {
+                     double feinte, int cadence, int repit, double recul, int souffle) {
         public boolean distance() { return role.equals("distance"); }
     }
 
@@ -218,7 +223,9 @@ public record Combat(int niveauMin, int niveauMax, double vie, Rang rang, String
         }
         IA ia = new IA(role, i == null ? 12 : i.getDouble("aggro", 12), i == null ? 24 : i.getDouble("laisse", 24),
             Math.max(0, dMin), Math.max(dMin, dMax), i == null ? 8 : i.getDouble("entraide", 8),
-            i == null ? 1 : i.getDouble("vitesse", 1), i == null ? 0.35 : i.getDouble("feinte", 0.35));
+            i == null ? 1 : i.getDouble("vitesse", 1), i == null ? 0.35 : i.getDouble("feinte", 0.35),
+            Math.max(0, i == null ? 24 : i.getInt("cadence", 24)), Math.max(0, i == null ? 80 : i.getInt("repit", 80)),
+            Math.max(0.1, i == null ? 0.85 : i.getDouble("recul", 0.85)), Math.max(0, i == null ? 40 : i.getInt("souffle", 40)));
         Defauts d = new Defauts(type, magique);
         Competence base = s.contains("coup-de-base") && !s.isConfigurationSection("coup-de-base") && !s.getBoolean("coup-de-base", true) ? null
             : Competence.lire(id, "coup_de_base", s.isConfigurationSection("coup-de-base") ? s.getConfigurationSection("coup-de-base")

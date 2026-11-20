@@ -42,9 +42,14 @@ cr_meche_sourde:
       role: distance            # contact (va au corps à corps) ou distance (garde ses distances)
       aggro: 14                 # le premier joueur vu à 14 blocs devient sa cible
       laisse: 28                # trop loin de son point de départ : il abandonne, rentre et récupère sa Vie
-      distance: [6, 11]         # il recule sous 6 blocs, se rapproche au-delà de 11, tourne autour entre les deux
+      distance: [5, 11]         # il recule sous 5 blocs, se rapproche au-delà de 11, tourne autour entre les deux
       entraide: 8               # les Mèches-sourdes à 8 blocs le rejoignent
-      vitesse: 1.1              # multiplicateur de ses déplacements en combat
+      vitesse: 1.0              # multiplicateur de ses déplacements en combat
+      # Réglages de difficulté (ce sont les valeurs par défaut) :
+      recul: 0.85               # vitesse quand il recule (× sa vitesse) : plus bas, on le rattrape plus vite
+      souffle: 40               # après 40 tics de recul il est essoufflé : il tient sa place 60 tics, on peut le frapper
+      cadence: 24               # à plusieurs sur un joueur : 24 tics au moins entre deux attaques du groupe sur lui
+      repit: 80                 # à plusieurs : 80 tics entre deux attaques lourdes (salve, pluie, éclaboussure) sur lui
     coup-de-base:               # coup de chandelier quand on le colle (animation « attack », le coup tombe au tic 8)
       portee: 2.5
       type: Impact
@@ -54,7 +59,7 @@ cr_meche_sourde:
       recuperation: 6
       recharge: 26
     competences:
-      goutte_ardente:           # son tir courant : rapide, il vise où tu vas
+      goutte_ardente:           # son tir courant : rapide, il vise un peu en avant de toi
         nom: "Goutte ardente"
         animation: atk_goutte_rapide
         forme: projectile       # en cloche ; touche de plein fouet un joueur sur sa route, sinon éclate au sol
@@ -64,9 +69,9 @@ cr_meche_sourde:
         signal: 8
         actif: 1
         recuperation: 5
-        recharge: 28
+        recharge: 40
         vitesse: 1.1            # blocs par tic
-        anticipation: 0.85      # 0 = où tu es ; 1 = où tu seras si tu continues tout droit
+        anticipation: 0.6       # 0 = où tu es ; 1 = où tu seras si tu continues tout droit
         alteration: Brulure
         duree: 3
         depart: g_flame_r
@@ -83,45 +88,46 @@ cr_meche_sourde:
         salve: 3
         intervalle: 5
         recuperation: 8
-        recharge: 110
+        recharge: 160
         vitesse: 1.1
-        anticipation: 0.8
-        flaque: 50              # flaque brûlante de 2,5 s : un coup à 25 % toutes les 10 tics à qui reste dedans
+        anticipation: 0.6
+        flaque: 40              # flaque brûlante de 2 s : un coup à 25 % toutes les 10 tics à qui reste dedans
         flaque-multiplicateur: 0.25
         alteration: Brulure
         duree: 3
         depart: [g_flame_r, g_flame_l, g_flame_c]
         effets: { marque: fx_cire_marque, projectile: fx_cire_goutte, impact: fx_cire_impact, flaque: fx_cire_flaque }
-      pluie_de_suif:            # trois cercles : sur toi, sur ta route, à côté ; ils se remplissent puis la cire tombe
+      pluie_de_suif:            # deux cercles : sur toi et sur ta route ; ils se remplissent puis la cire tombe
         nom: "Pluie de suif"
         animation: atk_pluie_rapide
         forme: zone
         portee: [3, 10]
         rayon: 2.6
-        zones: 3
+        zones: 2
         dispersion: 4
         multiplicateur: 0.9
         signal: 18
         actif: 4
         recuperation: 21
-        recharge: 200
-        flaque: 60
+        recharge: 240
+        flaque: 40
         alteration: Ralentissement
         duree: 3
         effets: { marque: fx_cire_marque, pluie: fx_cire_pluie, flaque: fx_cire_flaque }
-      eclaboussure:             # collé de trop près : il fait gicler la cire autour de lui, te repousse et bondit en arrière
+      eclaboussure:             # frappé de près : il fait gicler la cire autour de lui, te repousse et bondit en arrière
         nom: "Éclaboussure"
         animation: atk_eclaboussure
         forme: cercle
-        rayon: 3
+        rayon: 2.6
         portee: 2.6             # se déclenche quand sa cible est à 2,6 blocs ou moins
+        presse: 2               # seulement après 2 coups reçus en 3 s : tu as le temps de le frapper
         multiplicateur: 0.9
-        signal: 7
+        signal: 12              # 0,6 s pour sortir du cercle
         actif: 1
         recuperation: 8
-        recharge: 110
-        repousse: 1.3
-        bond: -5.5              # bond de 5,5 blocs en arrière après le coup
+        recharge: 200
+        repousse: 0.8
+        bond: -4                # bond de 4 blocs en arrière après le coup
         alteration: Brulure
         duree: 2
         effets: { marque: fx_cire_marque, impact: fx_cire_impact }

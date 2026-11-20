@@ -1,5 +1,18 @@
 # Journal des changements
 
+## 1.5.1 (novembre 2026) : équilibre des groupes
+
+Retour de l'essai de la 1.5.0 : un groupe de trois Mèches-sourdes ne se laissait plus approcher.
+- **Chacun son tour** : à plusieurs sur le même joueur (rangs normal et élite), `ia.cadence` tics au moins entre deux
+  attaques du groupe sur lui (24 par défaut, le coup de base n'est pas compté) et `ia.repit` tics entre deux attaques
+  lourdes (80 par défaut ; `lourde:` d'une attaque, par défaut les salves, plusieurs zones, flaques, repousse et bond).
+- **Il se dégage seulement s'il est frappé** : `presse: 2` (par défaut pour un bond en arrière) : l'attaque n'est
+  possible qu'après 2 coups reçus en 3 s.
+- **Recul** : `ia.recul` (0,85 par défaut) et `ia.souffle` (40 tics) : après 2 s de recul il est essoufflé et tient sa
+  place 3 s.
+- Exemple `mobs/combat.yml` adouci (l'ancien est gardé en `combat.yml.ancien`) : Goutte ardente moins fréquente et qui
+  anticipe moins, Pluie de suif à deux cercles, flaques plus courtes, Éclaboussure plus lente, moins forte et plus rare.
+
 ## 1.5.0 (novembre 2026) : retours de l'essai du cerveau de combat
 
 - **Plus de nom au-dessus des mobs**, seulement leur barre de vie, en combat (`combat.nom-visible: true` pour le nom et

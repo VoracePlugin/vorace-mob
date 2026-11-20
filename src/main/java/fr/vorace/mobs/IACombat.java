@@ -66,6 +66,8 @@ final class IACombat {
         final List<Modeles.Instance> marques = new ArrayList<>();
         boolean bondFait, pluieFaite;
         long bondJusqua;
+        /** Recul : début de la série en cours, dernier tic de recul, essoufflé jusqu'à ce tic. */
+        long reculDepuis, reculDernier, essouffle;
         /** Tics des derniers coups reçus (pressé : 3 coups en 2 s). */
         final java.util.ArrayDeque<Long> coups = new java.util.ArrayDeque<>();
         String mode = "garde", anim;
@@ -119,6 +121,8 @@ final class IACombat {
     private final List<Flaque> flaques = new ArrayList<>();
     /** joueur en combat → {x, z, vx, vz} : son allure lissée, pour viser où il va. */
     private final Map<UUID, double[]> allures = new HashMap<>();
+    /** joueur → {tic à partir duquel un mob du groupe peut l'attaquer, tic à partir duquel une attaque lourde peut partir}. */
+    private final Map<UUID, long[]> rythme = new HashMap<>();
     private final Set<String> boucles = new HashSet<>();
 
     IACombat(VoraceMob plugin, Mobs mobs) {
@@ -475,10 +479,25 @@ final class IACombat {
         }
         mob.getPathfinder().stopPathfinding();
         regarder(mob, c);
+        if (ia.distance() && d < min - 0.3 && t < e.essouffle) {
+            // essoufflé : il ne recule plus, il tient sa place face à sa cible (c'est le moment de le frapper)
+            arreter(mob);
+            e.mode = "essouffle";
+            jouerBoucle(s, m, "garde");
+            return;
+        }
         if (ia.distance() && d < min - 0.3) {
-            // trop près : il recule face à la cible, ou se décale si un mur le bloque
+            // trop près : il recule face à la cible, ou se décale si un mur le bloque ; au bout de son souffle, il s'arrête
+            if (t - e.reculDernier > 20) e.reculDepuis = t;
+            e.reculDernier = t;
+            if (ia.souffle() > 0 && t - e.reculDepuis >= ia.souffle()) {
+                e.essouffle = t + ia.souffle() * 3L / 2;
+                e.reculDernier = 0;
+                arreter(mob);
+                return;
+            }
             Vector recul = versCible.clone().multiply(-1).add(separation).normalize();
-            if (deplacer(mob, recul, vitesse(s, mob) * 1.1)) { e.mode = "recul"; jouerBoucle(s, m, "recul"); return; }
+            if (deplacer(mob, recul, vitesse(s, mob) * ia.recul())) { e.mode = "recul"; jouerBoucle(s, m, "recul"); return; }
             Vector cote = new Vector(-versCible.getZ() * e.sens, 0, versCible.getX() * e.sens);
             if (!deplacer(mob, cote, vitesse(s, mob))) { e.sens = -e.sens; arreter(mob); jouerBoucle(s, m, "garde"); return; }
             jouerBoucle(s, m, e.sens > 0 ? "gauche" : "droite");
@@ -603,8 +622,13 @@ final class IACombat {
         boolean vue = mob.hasLineOfSight(cible);
         List<Competence> pretes = new ArrayList<>();
         double total = 0;
-        for (Competence a : cb.competences()) {
+        // à plusieurs sur le même joueur (rangs normal et élite) : chacun son tour, une attaque lourde à la fois
+        long[] ry = enGroupe(cb, cible) ? rythme.get(cible.getUniqueId()) : null;
+        boolean attendre = ry != null && t < ry[0], sansLourde = ry != null && t < ry[1];
+        int recus = coupsRecus(e.coups, t, 60);
+        for (Competence a : attendre ? List.<Competence>of() : cb.competences()) {
             if (t < e.prete.getOrDefault(a.id(), 0L) || e.phase < a.phase() || ratio > a.vieMax()) continue;
+            if (recus < a.presse() || (sansLourde && a.lourde())) continue;
             boolean ok = switch (a.forme()) {
                 case CERCLE -> d <= a.porteeMax() + 0.3;
                 case CONE, LIGNE -> d <= a.rayon() && d >= a.porteeMin() && vue;
@@ -615,7 +639,7 @@ final class IACombat {
             pretes.add(a);
             total += a.poids();
         }
-        // une attaque qui le dégage (bond en arrière) passe avant tout : collé ou pressé, il se dégage
+        // une attaque qui le dégage (bond en arrière) passe avant tout : frappé de près, il se dégage
         for (Competence a : pretes) if (a.bond() < 0) return a;
         if (!pretes.isEmpty() && total > 0) {
             double r = hasard.nextDouble() * total;
@@ -627,9 +651,35 @@ final class IACombat {
         return null;
     }
 
+    /** Vrai si ce mob partage son rythme d'attaque : rang normal ou élite, et au moins deux mobs sur ce joueur. */
+    private boolean enGroupe(Combat cb, Player cible) {
+        if (cb.rang() != Combat.Rang.NORMAL && cb.rang() != Combat.Rang.ELITE) return false;
+        Set<UUID> l = parJoueur.get(cible.getUniqueId());
+        return l != null && l.size() >= 2;
+    }
+
+    /** Nombre de coups reçus dans les {@code tics} derniers tics. */
+    static int coupsRecus(java.util.Collection<Long> coups, long t, int tics) {
+        int n = 0;
+        for (long c : coups) if (t - c <= tics) n++;
+        return n;
+    }
+
+    /** Tics à partir desquels le groupe peut de nouveau attaquer ce joueur : {une attaque, une attaque lourde}. */
+    static long[] rythmeApres(long[] avant, long t, Competence c, int cadence, int repit) {
+        long[] r = avant == null ? new long[2] : avant;
+        r[0] = Math.max(r[0], t + cadence);
+        if (c.lourde()) r[1] = Math.max(r[1], t + c.total() + repit);
+        return r;
+    }
+
     private void demarrer(Mobs.Suivi s, Mob mob, Modeles.Instance m, Competence c, Player cible) {
         Etat e = s.ia;
         long t = tic();
+        Combat cbt = s.d.combat();
+        if (c != cbt.coupDeBase() && (cbt.rang() == Combat.Rang.NORMAL || cbt.rang() == Combat.Rang.ELITE))
+            rythme.put(cible.getUniqueId(), rythmeApres(rythme.get(cible.getUniqueId()), t, c, cbt.ia().cadence(), cbt.ia().repit()));
+        if (c.presse() > 0) e.coups.clear();
         e.enCours = c;
         e.t0 = t;
         e.frappe = false;
@@ -971,6 +1021,7 @@ final class IACombat {
 
     private void suivreJoueurs() {
         allures.keySet().retainAll(parJoueur.keySet());
+        rythme.keySet().retainAll(parJoueur.keySet());
         for (UUID u : parJoueur.keySet()) {
             Player p = Bukkit.getPlayer(u);
             if (p == null) continue;
@@ -1092,6 +1143,7 @@ final class IACombat {
         for (Mobs.Suivi s : mobs.suivis()) if (s.ia != null) { cacherBarre(s); retirerMarques(s.ia); }
         parJoueur.clear();
         allures.clear();
+        rythme.clear();
     }
 
     /** Un coup reçu d'un joueur (pour savoir s'il est pressé). */
