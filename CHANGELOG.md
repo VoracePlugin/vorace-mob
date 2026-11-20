@@ -10,6 +10,8 @@ Retour de l'essai de la 1.5.0 : un groupe de trois Mèches-sourdes ne se laissai
   possible qu'après 2 coups reçus en 3 s.
 - **Recul** : `ia.recul` (0,85 par défaut) et `ia.souffle` (40 tics) : après 2 s de recul il est essoufflé et tient sa
   place 3 s.
+- **Mode spectateur** (joueur à terre, caméra d'un ultime) : le mob invisible qui porte un modèle n'apparaît plus en
+  transparence ; il est caché à ce joueur le temps du mode spectateur, avec sa barre de vie (le modèle reste visible).
 - Exemple `mobs/combat.yml` adouci (l'ancien est gardé en `combat.yml.ancien`) : Goutte ardente moins fréquente et qui
   anticipe moins, Pluie de suif à deux cercles, flaques plus courtes, Éclaboussure plus lente, moins forte et plus rare.
 

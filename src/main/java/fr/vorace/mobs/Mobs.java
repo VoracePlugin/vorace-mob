@@ -562,10 +562,46 @@ public final class Mobs {
         return null;
     }
 
+    // ------------------------------------------------------------------ spectateurs
+
+    /** Joueurs en mode spectateur à qui les porteurs invisibles sont cachés. */
+    private final Set<UUID> spectateurs = new HashSet<>();
+
+    /**
+     * Un joueur en mode spectateur (à terre, caméra d'un ultime) voit les entités invisibles en transparence : le porteur
+     * d'un modèle lui apparaîtrait comme un fantôme. On le lui cache, avec sa barre de vie (elle le chevauche : sans lui,
+     * elle resterait figée) ; le modèle, lui, reste visible. Tout lui est rendu quand il quitte ce mode.
+     */
+    void spectateur(Player p, boolean oui) {
+        if (oui) spectateurs.add(p.getUniqueId());
+        else if (!spectateurs.remove(p.getUniqueId())) return;
+        for (Suivi s : suivis.values()) {
+            if (!(s.e instanceof LivingEntity le) || !le.isInvisible()) continue;
+            cacher(p, s.e, oui);
+            for (Entity passager : s.e.getPassengers()) if (passager instanceof org.bukkit.entity.Display) cacher(p, passager, oui);
+        }
+    }
+
+    private void cacher(Player p, Entity e, boolean oui) {
+        if (oui == p.canSee(e)) {
+            if (oui) p.hideEntity(plugin, e);
+            else p.showEntity(plugin, e);
+        }
+    }
+
+    void spectateurParti(Player p) { spectateurs.remove(p.getUniqueId()); }
+
     // ------------------------------------------------------------------ réflexion
 
     private void tic() {
         tic++;
+        if (tic % 5 == 0) {
+            // nouveaux mobs et nouvelles barres pour ceux qui regardent déjà, et modes changés sans événement
+            for (Player p : Bukkit.getOnlinePlayers()) {
+                boolean spectateur = p.getGameMode() == GameMode.SPECTATOR;
+                if (spectateur || spectateurs.contains(p.getUniqueId())) spectateur(p, spectateur);
+            }
+        }
         if (tic % 20 == 0) {
             Map<String, List<Suivi>> t = new HashMap<>();
             for (Suivi s : suivis.values()) if (s.troupeau != null) t.computeIfAbsent(s.troupeau, k -> new ArrayList<>()).add(s);

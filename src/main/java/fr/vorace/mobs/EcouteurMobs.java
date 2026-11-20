@@ -82,7 +82,15 @@ public final class EcouteurMobs implements Listener {
 
     @EventHandler
     public void depart(PlayerQuitEvent e) {
-        if (plugin.mobs() != null) plugin.mobs().ia().oublier(e.getPlayer());
+        if (plugin.mobs() == null) return;
+        plugin.mobs().ia().oublier(e.getPlayer());
+        plugin.mobs().spectateurParti(e.getPlayer());
+    }
+
+    /** Mode spectateur (à terre, caméra d'un ultime) : les porteurs invisibles des modèles sont cachés tout de suite. */
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void mode(org.bukkit.event.player.PlayerGameModeChangeEvent e) {
+        if (plugin.mobs() != null) plugin.mobs().spectateur(e.getPlayer(), e.getNewGameMode() == org.bukkit.GameMode.SPECTATOR);
     }
 
     @EventHandler
