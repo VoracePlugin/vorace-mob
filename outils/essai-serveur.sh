@@ -171,6 +171,8 @@ sleep 1
 cmd "say ESSAI-ZS-2"
 rm -f plugins/VoraceMob/zones/refuge.yml
 cmd "vmob recharger"
+# les mobs ont été chassés de la zone : le joueur va près d'eux pour qu'ils puissent le revoir
+cmd "tp Testeur 7 -60 3"
 sleep 10
 cmd "vmob info cr_"
 sleep 1
