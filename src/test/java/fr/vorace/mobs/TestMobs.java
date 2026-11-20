@@ -220,9 +220,9 @@ public final class TestMobs {
         verifier(ap != null && ap.nombre() == 4 && ap.troupeau() && ap.x() == 1 && ap.z() == 3 && ap.monde().equals("world") && ap.reapparition() == 300, "apparition lue");
         verifier(Apparition.lire("q", yf.getConfigurationSection("q"), pb) == null && pb.size() == 1, "apparition sans centre refusée");
         verifier(ap.niveau() == 0 && ap.cycle() == 0 && !ap.vagueDue(10_000_000, 1), "apparition : sans niveau ni cycle par défaut");
-        YamlConfiguration yc = YamlConfiguration.loadConfiguration(new java.io.StringReader(
+        YamlConfiguration ycv = YamlConfiguration.loadConfiguration(new java.io.StringReader(
             "v: { mob: b, centre: [0, 0, 0], nombre: 5, niveau: 12, cycle: 120 }"));
-        Apparition vague = Apparition.lire("v", yc.getConfigurationSection("v"), new ArrayList<>());
+        Apparition vague = Apparition.lire("v", ycv.getConfigurationSection("v"), new ArrayList<>());
         verifier(vague != null && vague.niveau() == 12 && vague.cycle() == 120, "apparition : niveau et cycle lus");
         verifier(!vague.vagueDue(100_000, 0) && !vague.vagueDue(100_000, 50_000) && vague.vagueDue(170_000, 50_000) && vague.vagueDue(171_000, 50_000),
             "cycle : rien ne manque = pas de vague ; la vague vient 120 s après la première mort");
