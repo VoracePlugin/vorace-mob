@@ -205,7 +205,7 @@ cr_grande_meche:
         rayon: 4.5
         portee: 3.6
         multiplicateur: 1.0
-        signal: 7
+        signal: 12
         recuperation: 8
         recharge: 120
         repousse: 1.6
