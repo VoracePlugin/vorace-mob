@@ -1,5 +1,15 @@
 # Journal des changements
 
+## 1.6.1 (retours des essais en jeu du Seuil)
+
+- Un coup de mob ne repousse plus le joueur par le recul du jeu : seulement par son réglage `repousse`. Avant, chaque
+  projectile, chaque flaque et chaque coup de base poussait le joueur (et l'éloignait des mobs à distance).
+- `animation-frappe: <tic>` sur une compétence : le tic de l'animation où le geste frappe. L'animation part plus tard pour que
+  ce geste tombe à la fin du signal. Exemples corrigés : l'Éclaboussure giclait 5 tics avant le coup, le Cierge abattu
+  s'abattait 8 tics avant.
+- Point d'apparition modifié (autre mob, autre niveau) : les anciens mobs du point, au repos, sont remplacés tout de suite
+  au lieu de rester jusqu'à leur mort.
+
 ## 1.6.0 (novembre 2026) : le donjon (zone sûre, niveau et cycle des apparitions)
 
 Pour le plugin du donjon de Babel, mais utile à tout serveur.

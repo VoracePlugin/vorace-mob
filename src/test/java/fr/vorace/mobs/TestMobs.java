@@ -332,6 +332,9 @@ public final class TestMobs {
         verifier(eclab != null && eclab.forme() == Competence.Forme.CERCLE && eclab.porteeMax() == 2.6 && eclab.repousse() == 0.8
             && eclab.bond() == -4 && eclab.total() == 21 && eclab.presse() == 2 && eclab.lourde(),
             "Éclaboussure lue (cercle, repousse, bond en arrière, seulement après 2 coups reçus)");
+        verifier(eclab.animationFrappe() == 7 && eclab.departAnimation() == 5 && eclab.departAnimation() + 16 == eclab.total()
+            && goutte.animationFrappe() == 0 && goutte.departAnimation() == 0,
+            "animation-frappe : l'Éclaboussure part 5 tics après le début (le geste du tic 7 tombe au tic 12, fin au tic 21) ; sans réglage, tout de suite");
         // rythme d'un groupe : une attaque à la fois sur un joueur, une lourde à la fois
         verifier(IACombat.coupsRecus(List.of(10L, 50L, 100L), 110, 60) == 2 && IACombat.coupsRecus(List.of(), 110, 60) == 0, "coups reçus en 3 s");
         long[] ry = IACombat.rythmeApres(null, 100, goutte, cm.ia().cadence(), cm.ia().repit());

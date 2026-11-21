@@ -533,6 +533,13 @@ public final class Mobs {
         return null;
     }
 
+    /** Vrai si ce mob ne correspond plus à son point d'apparition (mob retiré du point, niveau changé) et n'est pas en combat. */
+    private boolean perime(Apparition a, Suivi s) {
+        if (s.ia != null && s.ia.engage) return false;
+        if (!a.mobs().contains(s.d.id())) return true;
+        return a.niveau() > 0 && s.d.combattant() && s.niveau != a.niveau();
+    }
+
     private void verifierApparitions() {
         long maintenant = System.currentTimeMillis();
         for (Apparition a : apparitions.values()) {
@@ -548,6 +555,16 @@ public final class Mobs {
             for (UUID u : new ArrayList<>(et.membres)) {
                 Entity e = Bukkit.getEntity(u);
                 if (e != null && e.isValid()) {
+                    // le point a changé (autre mob, autre niveau) : l'ancien mob, au repos, est remplacé tout de suite
+                    Suivi su = suivis.get(u);
+                    if (su != null && perime(a, su)) {
+                        retirer(e);
+                        et.membres.remove(u);
+                        et.positions.remove(u);
+                        et.rempli = false;
+                        registreModifie = true;
+                        continue;
+                    }
                     Location l = e.getLocation();
                     et.positions.put(u, new double[]{l.getX(), l.getY(), l.getZ()});
                     continue;

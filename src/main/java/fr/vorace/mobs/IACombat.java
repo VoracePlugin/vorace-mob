@@ -68,6 +68,8 @@ final class IACombat {
         long bondJusqua;
         /** Recul : début de la série en cours, dernier tic de recul, essoufflé jusqu'à ce tic. */
         long reculDepuis, reculDernier, essouffle;
+        /** Tic où jouer l'animation de l'attaque en cours quand elle est retardée (« animation-frappe ») ; 0 : déjà jouée. */
+        long animA;
         /** Tics des derniers coups reçus (pressé : 3 coups en 2 s). */
         final java.util.ArrayDeque<Long> coups = new java.util.ArrayDeque<>();
         String mode = "garde", anim;
@@ -133,6 +135,17 @@ final class IACombat {
     }
 
     private long tic() { return mobs.tics(); }
+
+    /** Joueurs touchés par un mob : tic du coup. Le recul du jeu de ce coup (et son paquet de vitesse) est annulé. */
+    private final Map<UUID, Integer> sansRecul = new HashMap<>();
+
+    /** Vrai si ce joueur vient d'être touché par un mob (ce tic ou le précédent) : le recul du jeu ne s'applique pas. */
+    boolean sansRecul(Entity e) {
+        Integer t = sansRecul.get(e.getUniqueId());
+        if (t == null) return false;
+        if (Bukkit.getCurrentTick() - t > 1) { sansRecul.remove(e.getUniqueId()); return false; }
+        return true;
+    }
 
     // ================================================================== menace
 
@@ -745,9 +758,13 @@ final class IACombat {
                 }
             }
         }
+        e.animA = 0;
         if (m != null) {
-            if (c.animation() != null && m.modele().animations().containsKey(c.animation())) m.jouer(c.animation(), false);
-            else if (c.forme() == Competence.Forme.CONTACT) m.jouerAuto("attaque");
+            if (c.animation() != null && m.modele().animations().containsKey(c.animation())) {
+                // geste retardé : il frappe à la fin du signal, quand le coup touche
+                if (c.departAnimation() > 0) e.animA = t + c.departAnimation();
+                else m.jouer(c.animation(), false);
+            } else if (c.forme() == Competence.Forme.CONTACT) m.jouerAuto("attaque");
         }
         if (c.annonce() != null) annoncer(s, c.annonce());
         if (c.fixation() != null && vise.isOnline()) vise.sendActionBar(Messages.mini("<red>" + nom(s) + " te prend pour cible !"));
@@ -772,6 +789,10 @@ final class IACombat {
         long t = tic(), dt = t - e.t0;
         Player vise = Bukkit.getPlayer(e.cibleAttaque);
         if (!cibleValide(vise, mob)) vise = cible;
+        if (e.animA > 0 && t >= e.animA) {
+            e.animA = 0;
+            if (m != null && c.animation() != null && m.modele().animations().containsKey(c.animation())) m.jouer(c.animation(), false);
+        }
         boolean bond = t < e.bondJusqua;
         if (!bond) arreter(mob);
         // il suit sa cible du regard tant qu'il vise (contact, projectile) ; une zone posée ne bouge plus
@@ -948,6 +969,8 @@ final class IACombat {
         CoupMob coup = CoupMob.de(s.d.combat(), s.niveau, c, s.ia.bonus * part);
         s.coupEnCours = coup;
         s.sansAnimAuto = true;
+        // le recul du jeu ne s'applique pas : un coup ne repousse que par son réglage « repousse » (plus bas)
+        sansRecul.put(p.getUniqueId(), Bukkit.getCurrentTick());
         try {
             p.setNoDamageTicks(0);
             p.damage(Math.max(1, coup.puissance() * coup.multiplicateur() / 20.0), mob);
@@ -955,6 +978,7 @@ final class IACombat {
             s.coupEnCours = null;
             s.sansAnimAuto = false;
         }
+        if (c.repousse() > 0 && part >= 1) sansRecul.remove(p.getUniqueId());
         if (c.repousse() > 0 && part >= 1 && p.isValid() && !p.isDead()) {
             Vector v = p.getLocation().toVector().subtract(mob.getLocation().toVector()).setY(0);
             if (v.lengthSquared() < 1e-4) v = new Vector(1, 0, 0);
