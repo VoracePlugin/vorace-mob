@@ -25,6 +25,18 @@ public final class EcouteurMobs implements Listener {
         this.plugin = plugin;
     }
 
+    /** Un coup de mob ne repousse pas par le recul du jeu : seulement par son réglage « repousse ». */
+    @EventHandler(ignoreCancelled = true)
+    public void reculDuJeu(io.papermc.paper.event.entity.EntityKnockbackEvent e) {
+        if (e.getEntity() instanceof Player && plugin.mobs().ia().sansRecul(e.getEntity())) e.setCancelled(true);
+    }
+
+    /** Le paquet de vitesse qui suit un coup de mob figerait l'élan du joueur : il n'est pas envoyé. */
+    @EventHandler(ignoreCancelled = true)
+    public void vitesseApresCoup(org.bukkit.event.player.PlayerVelocityEvent e) {
+        if (plugin.mobs().ia().sansRecul(e.getPlayer())) e.setCancelled(true);
+    }
+
     @EventHandler
     public void chargement(EntitiesLoadEvent e) {
         plugin.mobs().charger(e.getEntities());

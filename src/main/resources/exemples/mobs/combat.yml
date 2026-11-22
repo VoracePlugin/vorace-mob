@@ -117,6 +117,7 @@ cr_meche_sourde:
       eclaboussure:             # frappé de près : il fait gicler la cire autour de lui, te repousse et bondit en arrière
         nom: "Éclaboussure"
         animation: atk_eclaboussure
+        animation-frappe: 7     # le geste gicle au tic 7 de l'animation : elle part 5 tics après le début, pour gicler quand le coup tombe
         forme: cercle
         rayon: 2.6
         portee: 2.6             # se déclenche quand sa cible est à 2,6 blocs ou moins
@@ -201,6 +202,7 @@ cr_grande_meche:
       eclaboussure:
         nom: "Éclaboussure"
         animation: atk_eclaboussure
+        animation-frappe: 7
         forme: cercle
         rayon: 4.5
         portee: 3.6
@@ -216,6 +218,7 @@ cr_grande_meche:
       cierge_abattu:
         nom: "Cierge abattu"
         animation: attack
+        animation-frappe: 8     # le chandelier s'abat au tic 8 de « attack » : l'animation part 8 tics après le début du signal
         forme: ligne
         portee: [0, 8]
         rayon: 8                # longueur

@@ -54,6 +54,7 @@ import java.util.Locale;
  *   fixation: hasard         # boss : la cible de l'attaque est choisie par le script (hasard, loin, proche), marquée
  *   vie-max: 0.6             # seulement sous 60 % de Vie
  *   interruptible: true      # un contrôle pendant le signal l'annule
+ *   animation-frappe: 7      # tic de l'animation où le geste frappe : elle est retardée pour qu'il tombe à la fin du signal
  * </pre>
  */
 public record Competence(String id, String nom, String animation, Forme forme, double porteeMin, double porteeMax,
@@ -62,7 +63,7 @@ public record Competence(String id, String nom, String animation, Forme forme, d
                          int couleur, double poids, String annonce, String fixation, double vieMax, boolean interruptible,
                          int phase, double vitesse, double anticipation, int salve, int intervalle, int zones,
                          double dispersion, double repousse, double bond, int flaque, double flaqueMult, Effets effets,
-                         int presse, boolean lourde) {
+                         int presse, boolean lourde, int animationFrappe) {
 
     /** Modèles animés des effets d'une attaque (null : particules). */
     public record Effets(String marque, String projectile, String impact, String pluie, String flaque) {
@@ -102,6 +103,12 @@ public record Competence(String id, String nom, String animation, Forme forme, d
             };
         }
     }
+
+    /**
+     * Tics d'attente avant de jouer l'animation : avec « animation-frappe » (le tic de l'animation où le geste frappe),
+     * elle part plus tard pour que ce geste tombe à la fin du signal, quand le coup touche. 0 : elle part tout de suite.
+     */
+    public int departAnimation() { return animationFrappe > 0 && signal > animationFrappe ? signal - animationFrappe : 0; }
 
     /** Durée totale (signal + actif + récupération), en tics. */
     public int total() { return signal + actif + recuperation + (salve - 1) * intervalle; }
@@ -179,6 +186,6 @@ public record Competence(String id, String nom, String animation, Forme forme, d
             Math.max(1, s.getInt("intervalle", 4)), Math.max(1, s.getInt("zones", 1)), Math.max(0, s.getDouble("dispersion", rayon * 1.4)),
             Math.max(0, s.getDouble("repousse", 0)), s.getDouble("bond", 0), Math.max(0, s.getInt("flaque", 0)),
             Math.max(0, s.getDouble("flaque-multiplicateur", 0.25)), Effets.lire(s.getConfigurationSection("effets")),
-            Math.max(0, s.getInt("presse", bond < 0 ? 2 : 0)), lourde);
+            Math.max(0, s.getInt("presse", bond < 0 ? 2 : 0)), lourde, Math.max(0, s.getInt("animation-frappe", 0)));
     }
 }

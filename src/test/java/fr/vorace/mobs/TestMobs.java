@@ -180,6 +180,13 @@ public final class TestMobs {
         verifier(pre.contient(5, 10) && !pre.contient(11, 10) && rond.contient(103, 100) && !rond.contient(106, 100), "zones : rectangle et cercle");
         verifier(tri.contient(2, 2) && !tri.contient(8, 8), "zones : polygone");
         verifier(faux == null && pb.size() == 1, "zone sans forme signalée");
+        // zone sûre
+        YamlConfiguration zs = YamlConfiguration.loadConfiguration(new java.io.StringReader(String.join("\n",
+            "village: { monde: donjon, rectangle: [0, 0, 20, 20], sure: true }", "autre: { cercle: [0, 0, 5] }")));
+        pb.clear();
+        Zone village = Zone.lire("village", zs.getConfigurationSection("village"), pb), autre = Zone.lire("autre", zs.getConfigurationSection("autre"), pb);
+        verifier(village.sure() && village.monde().equals("donjon") && village.contient(10, 10) && !autre.sure() && pb.isEmpty(), "zone sûre lue (sure: true), les autres ne le sont pas");
+        verifier(!pre.sure() && !rond.sure() && !tri.sure(), "zones : sûres seulement si demandé");
         verifier(pre.plusProche("eau", 4, 15).y() == 64 && pre.plusProche("eau", 4, 15).z() == 18 && pre.plusProche("abri", 0, 0) == null, "point d'intérêt le plus proche");
 
         // fichiers
@@ -212,6 +219,13 @@ public final class TestMobs {
         Apparition ap = Apparition.lire("p", yf.getConfigurationSection("p"), pb);
         verifier(ap != null && ap.nombre() == 4 && ap.troupeau() && ap.x() == 1 && ap.z() == 3 && ap.monde().equals("world") && ap.reapparition() == 300, "apparition lue");
         verifier(Apparition.lire("q", yf.getConfigurationSection("q"), pb) == null && pb.size() == 1, "apparition sans centre refusée");
+        verifier(ap.niveau() == 0 && ap.cycle() == 0 && !ap.vagueDue(10_000_000, 1), "apparition : sans niveau ni cycle par défaut");
+        YamlConfiguration ycv = YamlConfiguration.loadConfiguration(new java.io.StringReader(
+            "v: { mob: b, centre: [0, 0, 0], nombre: 5, niveau: 12, cycle: 120 }"));
+        Apparition vague = Apparition.lire("v", ycv.getConfigurationSection("v"), new ArrayList<>());
+        verifier(vague != null && vague.niveau() == 12 && vague.cycle() == 120, "apparition : niveau et cycle lus");
+        verifier(!vague.vagueDue(100_000, 0) && !vague.vagueDue(100_000, 50_000) && vague.vagueDue(170_000, 50_000) && vague.vagueDue(171_000, 50_000),
+            "cycle : rien ne manque = pas de vague ; la vague vient 120 s après la première mort");
 
         // vol des oiseaux et des papillons (sol plat en y 64, un toit de 6 de haut entre x 10 et 14)
         Vol.Sol plat = (x, z) -> (x >= 10 && x < 14) ? 70 : 64;
@@ -318,6 +332,9 @@ public final class TestMobs {
         verifier(eclab != null && eclab.forme() == Competence.Forme.CERCLE && eclab.porteeMax() == 2.6 && eclab.repousse() == 0.8
             && eclab.bond() == -4 && eclab.total() == 21 && eclab.presse() == 2 && eclab.lourde(),
             "Éclaboussure lue (cercle, repousse, bond en arrière, seulement après 2 coups reçus)");
+        verifier(eclab.animationFrappe() == 7 && eclab.departAnimation() == 5 && eclab.departAnimation() + 16 == eclab.total()
+            && goutte.animationFrappe() == 0 && goutte.departAnimation() == 0,
+            "animation-frappe : l'Éclaboussure part 5 tics après le début (le geste du tic 7 tombe au tic 12, fin au tic 21) ; sans réglage, tout de suite");
         // rythme d'un groupe : une attaque à la fois sur un joueur, une lourde à la fois
         verifier(IACombat.coupsRecus(List.of(10L, 50L, 100L), 110, 60) == 2 && IACombat.coupsRecus(List.of(), 110, 60) == 0, "coups reçus en 3 s");
         long[] ry = IACombat.rythmeApres(null, 100, goutte, cm.ia().cadence(), cm.ia().repit());
