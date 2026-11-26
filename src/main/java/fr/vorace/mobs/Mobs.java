@@ -414,6 +414,15 @@ public final class Mobs {
         if (s != null && s.d.combattant()) {
             if (e instanceof LivingEntity le && le.isDead()) {
                 try { butin.mort(s, e.getLocation()); } catch (Throwable ex) { erreur("butin " + s.d.id(), ex); }
+                // a-la-mort : ce qui naît à sa place (le crâne qui court du Squelette-mosaïque)
+                Mecaniques.Invocation inv = s.d.combat().meca().aLaMort();
+                if (inv != null) {
+                    Location ou = e.getLocation();
+                    for (int k = 0; k < inv.nombre(); k++) {
+                        try { invoquer(inv.mob(), ou.clone().add(hasard.nextDouble() - 0.5, 0.2, hasard.nextDouble() - 0.5), null, null, s.niveau); }
+                        catch (Throwable ex) { erreur("a-la-mort " + s.d.id(), ex); }
+                    }
+                }
             }
             ia.mort(s);
             combats.mort(s);
@@ -540,8 +549,34 @@ public final class Mobs {
         return a.niveau() > 0 && s.d.combattant() && s.niveau != a.niveau();
     }
 
+    /** Groupes de points d'apparition : départ commun de leur cycle, et groupes dont la vague vient de partir. */
+    private final Map<String, Long> debutGroupe = new HashMap<>();
+    private final Set<String> vaguesDeGroupe = new HashSet<>();
+
+    /** Un point d'apparition par son identifiant, ou null. */
+    Apparition apparition(String id) { return id == null ? null : apparitions.get(id); }
+
+    private java.lang.reflect.Method salleOccupee;
+    private boolean donjonCherche;
+
+    /** Vrai si cette salle de boss de Matsuri Donjon (« passeur » ou « 1:passeur ») est occupée ; faux sans lui. */
+    private boolean salleOccupee(String salle) {
+        if (!donjonCherche) {
+            donjonCherche = true;
+            org.bukkit.plugin.Plugin d = Bukkit.getPluginManager().getPlugin("MatsuriDonjon");
+            try {
+                salleOccupee = d == null ? null : Class.forName("fr.matsuri.donjon.DonjonAPI", true, d.getClass().getClassLoader()).getMethod("salleOccupee", String.class);
+            } catch (ReflectiveOperationException | LinkageError e) {
+                salleOccupee = null;
+            }
+        }
+        if (salleOccupee == null) return false;
+        try { return Boolean.TRUE.equals(salleOccupee.invoke(null, salle)); } catch (ReflectiveOperationException | RuntimeException e) { return false; }
+    }
+
     private void verifierApparitions() {
         long maintenant = System.currentTimeMillis();
+        vaguesDeGroupe.clear();
         for (Apparition a : apparitions.values()) {
             World w = Bukkit.getWorld(a.monde());
             if (w == null || !w.isChunkLoaded((int) Math.floor(a.x()) >> 4, (int) Math.floor(a.z()) >> 4)) continue;
@@ -579,15 +614,38 @@ public final class Mobs {
             }
             int manque = a.nombre() - et.membres.size();
             if (manque <= 0) { et.rempli = true; et.debutManque = 0; continue; }
+            if (a.cycle() > 0 && et.rempli && et.debutManque == 0) et.debutManque = maintenant;
+            // pause (Chapelle des cierges) : pas de vague pendant le combat du boss, ni sous les yeux d'un joueur ;
+            // jamais plus de « pause-max » secondes sans vague
+            if (et.rempli && (a.pauseSalle() != null || a.pauseJoueur() > 0)) {
+                long depuis = maintenant - (et.debutManque > 0 ? et.debutManque : et.derniereMort);
+                boolean proche = false;
+                if (a.pauseJoueur() > 0) {
+                    for (Player p : w.getPlayers()) {
+                        if (Geometrie.distance(p.getLocation().getX(), p.getLocation().getZ(), a.x(), a.z()) < a.pauseJoueur()) { proche = true; break; }
+                    }
+                }
+                if (a.enPause(a.pauseSalle() != null && salleOccupee(a.pauseSalle()), proche, depuis)) continue;
+            }
             int n;
             if (a.cycle() > 0 && et.rempli) {
-                // cycle : tous les mobs manquants reviennent ensemble, « cycle » secondes après la première mort
-                if (et.debutManque == 0) et.debutManque = maintenant;
-                if (!a.vagueDue(maintenant, et.debutManque)) continue;
+                // cycle : tous les mobs manquants reviennent ensemble, « cycle » secondes après la première mort ; les
+                // points d'un même « groupe » partagent ce départ (un groupe mêlé revient en une vague)
+                long debut = et.debutManque;
+                if (a.groupe() != null) debut = debutGroupe.merge(a.groupe(), et.debutManque, Math::min);
+                if (!a.vagueDue(maintenant, debut)) continue;
+                if (a.groupe() != null) vaguesDeGroupe.add(a.groupe());
                 n = manque;
             } else {
                 if (et.rempli && maintenant - et.derniereMort < a.reapparition() * 1000) continue;
                 n = et.rempli ? 1 : manque;
+            }
+            // monstre rare : une chance par tour ; raté, il faut attendre le tour suivant
+            if (a.chance() < 1 && hasard.nextDouble() >= a.chance()) {
+                if (a.cycle() > 0 && et.rempli) et.debutManque = maintenant;
+                else et.derniereMort = maintenant;
+                et.rempli = true;
+                continue;
             }
             int apparus = 0;
             for (int k = 0; k < n; k++) {
@@ -608,6 +666,7 @@ public final class Mobs {
             et.rempli = true;
             registreModifie = true;
         }
+        for (String g : vaguesDeGroupe) debutGroupe.remove(g);
     }
 
     /**

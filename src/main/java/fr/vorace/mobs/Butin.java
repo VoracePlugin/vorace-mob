@@ -117,7 +117,11 @@ final class Butin {
         UUID g = gagnant(degats);
         Player gagnant = g == null ? null : Bukkit.getPlayer(g);
         List<ItemStack> objets = gagnant == null ? new ArrayList<>() : tirer(c);
-        VoraceMobMortEvent ev = new VoraceMobMortEvent(s.e, s.d.id(), c.rang().nom(), s.niveau, Map.copyOf(degats), gagnant, objets, c.xpAuNiveau(s.niveau));
+        // point d'apparition : XP multipliée et objet en plus (régions de l'étage 1)
+        Apparition a = plugin.mobs().apparition(s.apparition);
+        if (gagnant != null && a != null && a.bonus() != null && hasard.nextDouble() < a.bonus().chance()) objets.addAll(objets(a.bonus().objet(), a.bonus().min()));
+        double xp = c.xpAuNiveau(s.niveau) * (a == null ? 1 : a.xpMult());
+        VoraceMobMortEvent ev = new VoraceMobMortEvent(s.e, s.d.id(), c.rang().nom(), s.niveau, Map.copyOf(degats), gagnant, objets, xp);
         Bukkit.getPluginManager().callEvent(ev);
         if (gagnant == null) return;
         for (ItemStack o : ev.getObjets()) {

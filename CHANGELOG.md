@@ -1,5 +1,26 @@
 # Journal des changements
 
+## 1.8.0 (étage 1 de Babel : mécaniques du bestiaire et points d'apparition)
+
+- **Mécaniques des monstres** (bloc `combat:`) :
+  - `a-la-mort: { invocation: e1_crane_qui_court, nombre: 1 }` : à sa mort, ces mobs naissent à sa place (même niveau,
+    sans point d'apparition) ;
+  - `garde: { reduction, angle, brise-apres, ouverture, animation }` : un coup reçu de face (dans l'angle) perd
+    `reduction` de ses dégâts (son de bouclier) ; après `brise-apres` coups gardés, la garde se brise : `ouverture` tics
+    sans garde et figé, son animation jouée. `VoraceMobAPI.gardeBrisee(entite)` (butin « si: garde_brisee » plus tard) ;
+  - `point-faible: { dos, multiplicateur, fige }` : frappé dans le dos (à plus de 120° de son regard), dégâts ×
+    `multiplicateur` et figé `fige` tics ;
+  - `jamais-mortel: true` (pantins d'Orario) : `VoraceMobAPI.jamaisMortel(entite)`, pour le plugin du combat.
+- **Points d'apparition** :
+  - `chance: 0.35` : monstre rare, une chance par tour (raté : on attend le tour suivant) ;
+  - `groupe: gl02` : les points du même groupe partagent le départ de leur cycle (un groupe mêlé revient en une vague) ;
+  - `xp-multiplicateur: 1.5` et `butin-bonus: { objet, nombre }` : XP et un objet en plus pour les mobs de ce point ;
+  - `pause-si-salle: passeur` (salle de Matsuri Donjon occupée), `pause-si-joueur: 24` (un joueur à 24 blocs : rien
+    n'apparaît sous ses yeux), `pause-max: 1200` (jamais plus de 1 200 s sans vague) ;
+  - `entraide: 0` : distance d'entraide des mobs de ce point (0 : on les prend un par un).
+- Pas encore lus : apparition par une paroi, ronde de la Faucheuse, munitions de la Mèche-sourde, `butin-special`,
+  `releve`, `second-coup`, `hors-donjon` et les autres clés « à apprendre » du bestiaire.
+
 ## 1.7.0 (étage 1 de Babel : taille du groupe et butin de vorace-item)
 
 - **Vie et dégâts selon la taille du groupe** (élites, élites ++, boss) : `vie-groupe: k` et `degats-groupe: {1: 0.4,

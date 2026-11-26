@@ -69,6 +69,11 @@ mouton:
   {1: 0.4, 2: 0.7}` : Puissance de ses coups × 0,4 contre un joueur seul, × 0,7 contre deux, × 1 à partir de trois.
   Au retour au calme, il revient à un joueur. Un plugin de donjon peut imposer le nombre (joueurs de l'arène) avec
   `VoraceMobAPI.imposerJoueurs(entite, n)`. `/vmob info` affiche `joueurs=`.
+- **Mécaniques** (`combat:`) : `a-la-mort` (des mobs naissent à sa place), `garde` (garde de face qui se brise après
+  quelques coups), `point-faible` (dos : dégâts multipliés, figé), `jamais-mortel` (pantins d'entraînement).
+- **Points d'apparition, en plus** : `chance` (monstre rare), `groupe` (même vague pour plusieurs points),
+  `xp-multiplicateur`, `butin-bonus`, `pause-si-salle` (salle de boss de Matsuri Donjon occupée), `pause-si-joueur`,
+  `pause-max`, `entraide`.
 - **Butin** (`combat.butin`) : `objet: minecraft:bone`, `vorace:<objet>` (objet de vorace-core) ou `item:<modèle>`
   (arme, armure, munition de [vorace-item](https://github.com/VoracePlugin/vorace-item), à son rang de base et à une
   place tirée au hasard dans sa fourchette de stats ; ignoré sans vorace-item).

@@ -111,6 +111,7 @@ final class Combats {
      * {@code source} : le joueur qui frappe (menace et butin), ou null.
      */
     double infliger(Mobs.Suivi s, double montant, Player source) {
+        montant = mobs.ia().garde(s, montant, source);   // garde de face, point faible (bestiaire)
         s.compteTic = Bukkit.getCurrentTick();
         s.dernierCombat = System.currentTimeMillis();
         double reel = Math.min(s.vie, Math.max(0, montant));

@@ -77,6 +77,10 @@ final class IACombat {
         BossBar barre;
         /** Taille du groupe ({@code vie-groupe}, {@code degats-groupe}) : joueurs verrouillés dans ce combat. */
         final Set<UUID> verrouilles = new HashSet<>();
+        /** Garde de face ({@link Mecaniques.Garde}) : coups gardés d'affilée, brisée jusqu'à ce tic, brisée au moins une fois. */
+        int coupsGardes;
+        long gardeBriseeJusqua;
+        boolean gardeBrisee;
         /** Nombre de joueurs imposé par un autre plugin (arène d'un boss), 0 : compté par vorace-mob. */
         int joueursImposes;
 
@@ -225,7 +229,8 @@ final class IACombat {
         else e.libreA = tic() + 8;
         if (s.e instanceof Mob mob) { mob.getPathfinder().stopPathfinding(); regarder(mob, p.getLocation()); }
         verrouiller(s, p);
-        double r = s.d.combat().ia().entraide();
+        Apparition app = mobs.apparition(s.apparition);
+        double r = app != null && app.entraide() >= 0 ? app.entraide() : s.d.combat().ia().entraide();
         if (r > 0) {
             for (Mobs.Suivi o : mobs.suivis()) {
                 if (o == s || o.ia == null || o.ia.engage || o.ia.rentre || !o.d.combattant() || !o.e.isValid()) continue;
@@ -272,6 +277,7 @@ final class IACombat {
         e.cible = null; e.provocateur = null; e.enCours = null; e.engage = false; e.rentre = true; e.phase = 0;
         e.vitessePhase = 1; e.bonus = 1; e.enrage = false;
         e.verrouilles.clear(); e.joueursImposes = 0;
+        e.coupsGardes = 0; e.gardeBriseeJusqua = 0; e.gardeBrisee = false;
         mobs.combats().ajusterGroupe(s);   // retour à 1 joueur
         cacherBarre(s);
         retirerMarques(e);
@@ -357,6 +363,42 @@ final class IACombat {
         }
         e.cible = meilleur;
         return Bukkit.getPlayer(meilleur);
+    }
+
+    // ================================================================== garde et point faible (bestiaire)
+
+    /**
+     * Dégâts d'un coup reçu de {@code source} après la garde de face et le point faible du mob ({@code combat.garde},
+     * {@code combat.point-faible}). Un coup gardé compte pour briser la garde ; un coup dans le dos peut le figer.
+     */
+    double garde(Mobs.Suivi s, double montant, Player source) {
+        Mecaniques m = s.d.combat().meca();
+        if (s.ia == null || source == null || (m.garde() == null && m.pointFaible() == null)) return montant;
+        Location ml = s.e.getLocation(), pl = source.getLocation();
+        double angle = Mecaniques.angle(regardMob(s), pl.getX() - ml.getX(), pl.getZ() - ml.getZ());
+        if (m.dos(angle)) {
+            if (m.pointFaible().fige() > 0) entraver(s, m.pointFaible().fige() * 50L, false, false);
+            return montant * m.pointFaible().multiplicateur();
+        }
+        if (!m.devant(angle) || tic() < s.ia.gardeBriseeJusqua) return montant;
+        Mecaniques.Garde g = m.garde();
+        s.ia.coupsGardes++;
+        s.e.getWorld().playSound(ml, Sound.ITEM_SHIELD_BLOCK, 0.8f, 1f);
+        if (g.briseApres() > 0 && s.ia.coupsGardes >= g.briseApres()) {
+            s.ia.coupsGardes = 0;
+            s.ia.gardeBrisee = true;
+            s.ia.gardeBriseeJusqua = tic() + g.ouverture();
+            s.e.getWorld().playSound(ml, Sound.ITEM_SHIELD_BREAK, 1f, 1f);
+            Modeles.Instance mi = modele(s);
+            if (g.animation() != null && mi != null && mi.modele().animations().containsKey(g.animation())) mi.jouer(g.animation(), false);
+            if (g.ouverture() > 0) entraver(s, g.ouverture() * 50L, false, false);
+        }
+        return montant * (1 - g.reduction());
+    }
+
+    /** Où regarde le mob : son modèle s'il en a un (il tourne seul), sinon l'entité. */
+    private float regardMob(Mobs.Suivi s) {
+        return s.e.getLocation().getYaw();
     }
 
     // ================================================================== contrôles (plugin du combat)

@@ -39,7 +39,7 @@ import java.util.Map;
 public record Combat(int niveauMin, int niveauMax, double vie, Rang rang, String type, boolean magique, boolean barre,
                      Map<String, Double> stats, int niveauBase, Map<String, Double> progression, double xp, IA ia,
                      Competence coupDeBase, List<Competence> competences, List<Lot> butin, List<Phase> phases, int enrage,
-                     boolean nomVisible, double vieGroupe, Map<Integer, Double> degatsGroupe) {
+                     boolean nomVisible, double vieGroupe, Map<Integer, Double> degatsGroupe, Mecaniques meca) {
 
     /** Distance (blocs) à laquelle un joueur est verrouillé dans le combat d'un mob qui suit la taille du groupe. */
     public static final double RAYON_GROUPE = 30;
@@ -290,7 +290,7 @@ public record Combat(int niveauMin, int niveauMax, double vie, Rang rang, String
         return new Combat(nMin, nMax, vie, rang, type, magique, s.getBoolean("barre", true), Map.copyOf(stats),
             s.getInt("niveau-base", nMin), Map.copyOf(prog), Math.max(0, s.getDouble("xp", 0)), ia, base, List.copyOf(comps),
             List.copyOf(butin), List.copyOf(phases), Math.max(0, s.getInt("enrage", 0)), s.getBoolean("nom-visible", false),
-            Math.max(0, s.getDouble("vie-groupe", 0)), degatsGroupe(id, s, problemes));
+            Math.max(0, s.getDouble("vie-groupe", 0)), degatsGroupe(id, s, problemes), Mecaniques.lire(id, s, problemes));
     }
 
     /** {@code degats-groupe: {1: 0.4, 2: 0.7}} : nombre de joueurs → facteur de Puissance. */

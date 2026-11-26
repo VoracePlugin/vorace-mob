@@ -229,6 +229,18 @@ public final class VoraceMobAPI {
         return true;
     }
 
+    /** Vrai si ses coups ne doivent jamais faire tomber un joueur ({@code combat.jamais-mortel} : pantins d'entraînement). */
+    public static boolean jamaisMortel(Entity e) {
+        Mobs.Suivi s = combattant(e);
+        return s != null && s.definition().combat().meca().jamaisMortel();
+    }
+
+    /** Vrai si la garde de face de ce mob a été brisée au moins une fois pendant ce combat (butin « si: garde_brisee »). */
+    public static boolean gardeBrisee(Entity e) {
+        Mobs.Suivi s = combattant(e);
+        return s != null && s.ia != null && s.ia.gardeBrisee;
+    }
+
     /** Le coup que ce mob porte en ce moment (pendant l'événement de dégâts de son coup), ou null. */
     public static CoupMob coupEnCours(Entity e) {
         Mobs.Suivi s = combattant(e);

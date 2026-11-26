@@ -430,6 +430,41 @@ public final class TestMobs {
         verifier(pb.isEmpty() && archer.butin().size() == 1 && archer.butin().get(0).objet().equals("item:e1_fleche_os")
             && archer.butin().get(0).min() == 3 && archer.butin().get(0).max() == 6, "butin : ligne item: lue (flèches en os ×3-6)");
 
+        // mécaniques du bestiaire : garde de face, point faible, mort qui invoque, pantins
+        YamlConfiguration ym = YamlConfiguration.loadConfiguration(new java.io.StringReader(String.join("\n",
+            "ossuaire: { type: skeleton, combat: { niveau: 2, vie: 200, garde: { reduction: 0.8, angle: 120, brise-apres: 3, ouverture: 20, animation: garde_brisee } } }",
+            "meche: { type: husk, combat: { niveau: 3, vie: 300, point-faible: { partie: meche, dos: true, multiplicateur: 2, fige: 80 } } }",
+            "mosaique: { type: skeleton, combat: { niveau: 1, vie: 100, a-la-mort: { invocation: e1_crane_qui_court, nombre: 1, depart: h_head } } }",
+            "pantin: { type: zombie, combat: { niveau: 1, vie: 100, jamais-mortel: true } }")));
+        pb.clear();
+        Mecaniques mo = DefinitionMob.lire("ossuaire", ym.getConfigurationSection("ossuaire"), pb).combat().meca();
+        Mecaniques mm = DefinitionMob.lire("meche", ym.getConfigurationSection("meche"), pb).combat().meca();
+        Mecaniques ms = DefinitionMob.lire("mosaique", ym.getConfigurationSection("mosaique"), pb).combat().meca();
+        Mecaniques mp = DefinitionMob.lire("pantin", ym.getConfigurationSection("pantin"), pb).combat().meca();
+        verifier(pb.isEmpty() && mo.garde() != null && mo.garde().briseApres() == 3 && mo.garde().reduction() == 0.8 && "garde_brisee".equals(mo.garde().animation())
+            && mm.pointFaible() != null && mm.pointFaible().fige() == 80 && ms.aLaMort() != null && ms.aLaMort().mob().equals("e1_crane_qui_court")
+            && mp.jamaisMortel() && seul.meca() == Mecaniques.AUCUNE, "mécaniques lues : garde, point faible, a-la-mort, jamais-mortel");
+        // le mob regarde le sud (yaw 0 : +z) : un joueur au sud est devant, au nord dans son dos
+        double devant = Mecaniques.angle(0, 0, 5), dos = Mecaniques.angle(0, 0, -5), cote = Mecaniques.angle(0, 5, 0), yaw90 = Mecaniques.angle(90, -5, 0);
+        verifier(devant < 1 && dos > 179 && Math.abs(cote - 90) < 1 && yaw90 < 1, "angle vers l'attaquant : devant 0°, dos 180°, côté 90° (yaw 90 : regarde vers −x)");
+        verifier(mo.devant(devant) && mo.devant(55) && !mo.devant(65) && !mo.dos(dos) && mm.dos(dos) && mm.dos(125) && !mm.dos(100),
+            "garde sur 120° devant (60° de chaque côté) ; point faible dans le dos (au-delà de 120°)");
+        // points d'apparition : chance, groupe, XP, butin, pauses, entraide
+        YamlConfiguration ya = YamlConfiguration.loadConfiguration(new java.io.StringReader(String.join("\n",
+            "rare: { mob: e1_porte_fardeau, monde: donjon, centre: [1, 40, 2], chance: 0.35, reapparition: 600, groupe: r1b, xp-multiplicateur: 1.5, butin-bonus: { objet: \"vorace:cristal_azur\", nombre: 1 }, entraide: 0 }",
+            "chapelle: { mob: e1_meche_sourde, monde: donjon, centre: [1, 40, 2], cycle: 180, pause-si-salle: passeur, pause-max: 1200, pause-si-joueur: 24 }",
+            "simple: { mob: e1_meche_sourde, monde: donjon, centre: [1, 40, 2] }")));
+        pb.clear();
+        Apparition rare = Apparition.lire("rare", ya.getConfigurationSection("rare"), pb), chap = Apparition.lire("chapelle", ya.getConfigurationSection("chapelle"), pb),
+            simple = Apparition.lire("simple", ya.getConfigurationSection("simple"), pb);
+        verifier(pb.isEmpty() && rare.chance() == 0.35 && "r1b".equals(rare.groupe()) && rare.xpMult() == 1.5 && rare.bonus() != null
+            && rare.bonus().objet().equals("vorace:cristal_azur") && rare.bonus().min() == 1 && rare.entraide() == 0
+            && simple.chance() == 1 && simple.groupe() == null && simple.xpMult() == 1 && simple.bonus() == null && simple.entraide() == -1,
+            "points d'apparition : chance, groupe, xp-multiplicateur, butin-bonus, entraide (et leurs valeurs par défaut)");
+        verifier(chap.enPause(true, false, 60_000) && chap.enPause(false, true, 60_000) && !chap.enPause(false, false, 60_000)
+            && !chap.enPause(true, true, 1_200_000) && !simple.enPause(true, true, 0),
+            "Chapelle : pas de vague pendant le combat du Passeur ni sous les yeux d'un joueur, 1 200 s au plus");
+
         System.out.println(echecs == 0 ? "TOUS LES TESTS PASSENT" : echecs + " ECHEC(S)");
         System.exit(echecs == 0 ? 0 : 1);
     }
