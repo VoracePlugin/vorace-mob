@@ -63,6 +63,15 @@ mouton:
 - **Mobs de combat** (bloc `combat:`, exemple dans `mobs/combat.yml`) : Vie gardée par vorace-mob, niveau, rang
   (normal, elite, elite++, mini-boss, boss), stats libres pour le plugin du combat ; nom, niveau et barre de vie
   au-dessus du mob pendant le combat.
+- **Taille du groupe** (élites et boss) : `vie-groupe: 0.7` dans `combat:` : à l'engagement, le joueur qui l'engage et
+  tous les joueurs à 30 blocs sont comptés, et chaque nouveau joueur qui le frappe ensuite s'ajoute ; Vie maximale ×
+  (1 + 0,7 × (joueurs − 1)), en gardant le même pourcentage de Vie quand elle monte en plein combat. `degats-groupe:
+  {1: 0.4, 2: 0.7}` : Puissance de ses coups × 0,4 contre un joueur seul, × 0,7 contre deux, × 1 à partir de trois.
+  Au retour au calme, il revient à un joueur. Un plugin de donjon peut imposer le nombre (joueurs de l'arène) avec
+  `VoraceMobAPI.imposerJoueurs(entite, n)`. `/vmob info` affiche `joueurs=`.
+- **Butin** (`combat.butin`) : `objet: minecraft:bone`, `vorace:<objet>` (objet de vorace-core) ou `item:<modèle>`
+  (arme, armure, munition de [vorace-item](https://github.com/VoracePlugin/vorace-item), à son rang de base et à une
+  place tirée au hasard dans sa fourchette de stats ; ignoré sans vorace-item).
 - **Joueurs en créatif** : ils comptent comme les autres pour faire vivre les mobs et les effrayer (oiseaux,
   lapins...), mais ne sont jamais attaqués. Seuls les spectateurs et les joueurs invisibles sont ignorés.
 - **IA** : `ia: vorace` (le cerveau remplace l'IA de déplacement du jeu), `ia: jeu` (l'IA du jeu, gardée en laisse :
@@ -72,7 +81,8 @@ mouton:
 - `/vmob [liste|invoquer <mob> [nombre]|info [début du nom|*] [joueur]|apparitions|retirer [rayon]|recharger]` ; `info` donne pour
   chaque mob son action, ses besoins, sa distance à la maison et la distance parcourue depuis son apparition (depuis la console,
   le nom d'un joueur relève les mobs autour de lui).
-- API : `fr.vorace.mobs.VoraceMobAPI` (`invoquerMob`, `mobVorace`, `actionMob`, `effrayerMob` ; combat : `stat`, `vie`, `infliger`, `coupEnCours`...) ; événement
+- API : `fr.vorace.mobs.VoraceMobAPI` (`invoquerMob`, `mobVorace`, `actionMob`, `effrayerMob` ; combat : `stat`, `vie`, `infliger`, `coupEnCours`,
+  `joueursDuCombat`, `imposerJoueurs`...) ; événement
   `fr.vorace.mobs.VoraceMobActionEvent` à chaque changement d'action.
 
 ## Installation

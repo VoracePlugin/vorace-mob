@@ -44,15 +44,65 @@ final class Butin {
             if (hasard.nextDouble() >= lot.chance()) continue;
             int n = lot.min() + (lot.max() > lot.min() ? hasard.nextInt(lot.max() - lot.min() + 1) : 0);
             if (n <= 0) continue;
-            ItemStack o = objet(lot.objet(), n);
-            if (o != null) l.add(o);
+            l.addAll(objets(lot.objet(), n));
         }
         return l;
     }
 
-    /** « minecraft:diamond », « diamond » ou « vorace:rubis » ; null si inconnu. */
+    /**
+     * Les objets d'une ligne tirée : une pile, ou {@code n} exemplaires d'un objet de vorace-item qui ne s'empile pas
+     * (arme, armure). Vide si l'objet est inconnu.
+     */
+    List<ItemStack> objets(String id, int n) {
+        List<ItemStack> l = new ArrayList<>();
+        if (!estItem(id)) {
+            ItemStack o = objet(id, n);
+            if (o != null) l.add(o);
+            return l;
+        }
+        while (n > 0) {
+            ItemStack o = objetItem(id.trim().substring(5).trim());
+            if (o == null) break;
+            int pile = Math.max(1, Math.min(n, o.getMaxStackSize()));
+            o.setAmount(pile);
+            l.add(o);
+            n -= pile;
+        }
+        return l;
+    }
+
+    /** Ligne de butin d'un modèle de vorace-item : « item:&lt;modèle&gt; ». */
+    static boolean estItem(String id) {
+        return id != null && id.trim().toLowerCase(Locale.ROOT).startsWith("item:");
+    }
+
+    /**
+     * Un exemplaire d'un modèle de vorace-item (plugin VoraceItem), à son rang de base et à une place tirée au hasard
+     * dans sa fourchette de stats ; null si vorace-item n'est pas là ou si le modèle n'existe pas. Appelé par réflexion :
+     * vorace-mob n'a pas besoin de vorace-item pour compiler ni pour tourner.
+     */
+    ItemStack objetItem(String modele) {
+        try {
+            Class<?> api = Class.forName("fr.vorace.item.api.VoraceItemAPI", true,
+                Bukkit.getPluginManager().getPlugin("VoraceItem") == null ? Butin.class.getClassLoader()
+                    : Bukkit.getPluginManager().getPlugin("VoraceItem").getClass().getClassLoader());
+            for (java.lang.reflect.Method m : api.getMethods()) {
+                if (!m.getName().equals("creerExemplaire") || m.getParameterCount() != 5) continue;
+                Object o = m.invoke(null, modele, null, hasard.nextDouble(), null, null);
+                return o instanceof ItemStack i ? i : null;
+            }
+        } catch (Throwable ignore) { }
+        return null;
+    }
+
+    /** « minecraft:diamond », « diamond » ou « vorace:rubis » ; null si inconnu (« item:... » : voir {@link #objets}). */
     ItemStack objet(String id, int n) {
         String t = id.trim();
+        if (estItem(t)) {
+            ItemStack o = objetItem(t.substring(5).trim());
+            if (o != null) o.setAmount(Math.max(1, Math.min(n, o.getMaxStackSize())));
+            return o;
+        }
         if (t.toLowerCase(Locale.ROOT).startsWith("vorace:")) {
             try { return VoraceAPI.objet(t.substring(7), n); } catch (Throwable e) { return null; }
         }

@@ -208,6 +208,27 @@ public final class VoraceMobAPI {
         return true;
     }
 
+    /**
+     * Nombre de joueurs comptés dans le combat de ce mob ({@code vie-groupe}, {@code degats-groupe}) ; 0 si ce n'est pas
+     * un mob de combat.
+     */
+    public static int joueursDuCombat(Entity e) {
+        Mobs.Suivi s = combattant(e);
+        return s == null || s.ia == null ? 0 : s.ia.joueurs();
+    }
+
+    /**
+     * Impose le nombre de joueurs d'un combat (par exemple les joueurs entrés dans l'arène d'un boss) ; sa Vie maximale
+     * suit en gardant son pourcentage. 0 rend le comptage à vorace-mob (joueurs à 30 blocs à l'engagement, puis chaque
+     * nouveau joueur qui le frappe). Faux si ce n'est pas un mob de combat.
+     */
+    public static boolean imposerJoueurs(Entity e, int joueurs) {
+        Mobs.Suivi s = combattant(e);
+        if (s == null) return false;
+        plugin.mobs().ia().imposerJoueurs(s, joueurs);
+        return true;
+    }
+
     /** Le coup que ce mob porte en ce moment (pendant l'événement de dégâts de son coup), ou null. */
     public static CoupMob coupEnCours(Entity e) {
         Mobs.Suivi s = combattant(e);

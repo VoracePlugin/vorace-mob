@@ -1,5 +1,21 @@
 # Journal des changements
 
+## 1.7.0 (étage 1 de Babel : taille du groupe et butin de vorace-item)
+
+- **Vie et dégâts selon la taille du groupe** (élites, élites ++, boss) : `vie-groupe: k` et `degats-groupe: {1: 0.4,
+  2: 0.7}` dans `combat:`. À l'engagement, le joueur qui l'engage et les joueurs à 30 blocs sont comptés ; chaque
+  nouveau joueur qui le frappe s'ajoute. Vie maximale = Vie × (1 + k × (joueurs − 1)), au même pourcentage si elle
+  monte en plein combat ; la barre de boss suit. Puissance de ses coups (coup de base, attaques, flaques) × le facteur
+  du nombre de joueurs (× 1 s'il n'est pas écrit). Au retour au calme, tout revient à un joueur. Sans ces clés, rien ne
+  change. Pour l'étage 1 : Passeur `vie: 12500, vie-groupe: 1.0, degats-groupe: {1: 0.4, 2: 0.7}` (même durée seul
+  qu'à six), élites `0.7`, Faucheuse `0.8`, Armure veuve `0.85`.
+- **API** : `VoraceMobAPI.joueursDuCombat(entite)` et `imposerJoueurs(entite, n)` (joueurs de l'arène d'un boss, pour le
+  plugin du donjon ; 0 rend le comptage à vorace-mob). `/vmob info` affiche `joueurs=`.
+- **Butin** : lignes `objet: item:<modèle>` (modèles de vorace-item : armes, armures, flèches), jusqu'ici ignorées. Un
+  exemplaire au rang de base du modèle et à une place tirée au hasard dans sa fourchette ; les objets qui ne s'empilent
+  pas tombent en autant d'exemplaires que le nombre tiré. `softdepend: [VoraceItem]`, appelé sans dépendance de
+  compilation : sans vorace-item, la ligne ne donne rien (signalée par `/vmob butin`).
+
 ## 1.6.1 (retours des essais en jeu du Seuil)
 
 - Un coup de mob ne repousse plus le joueur par le recul du jeu : seulement par son réglage `repousse`. Avant, chaque

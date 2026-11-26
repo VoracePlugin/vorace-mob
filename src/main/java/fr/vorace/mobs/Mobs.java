@@ -1084,7 +1084,7 @@ public final class Mobs {
                         if (s.d.combattant()) {
                             // le plugin du combat lit ce coup pendant l'événement de dégâts (Puissance, type...)
                             s.dernierCombat = System.currentTimeMillis();
-                            s.coupEnCours = CoupMob.deBase(s.d.combat());
+                            s.coupEnCours = CoupMob.deBase(s.d.combat()).fois(s.ia == null ? 1 : s.d.combat().facteurDegats(s.ia.joueurs()));
                             try { menace.damage(Math.max(1, s.d.degats()), mob); } finally { s.coupEnCours = null; }
                         } else {
                             menace.damage(s.d.degats(), mob);

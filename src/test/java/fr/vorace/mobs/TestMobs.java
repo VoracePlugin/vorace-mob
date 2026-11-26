@@ -396,6 +396,40 @@ public final class TestMobs {
         verifier(lignes > 190 && absents == 0 && inst.contains("modeles-animes/fx_cire_goutte.bbmodel") && inst.contains("objets/vorace-mob-barre.yml"),
             "installation.txt : " + lignes + " fichiers, tous dans le jar");
 
+        // taille du groupe : Vie et dégâts (Passeur de l'étage 1 : 12 500 × joueurs, dégâts × 0,4 seul, × 0,7 à deux)
+        YamlConfiguration yg = YamlConfiguration.loadConfiguration(new java.io.StringReader(String.join("\n",
+            "passeur: { type: husk, combat: { niveau: 5, vie: 12500, rang: boss, vie-groupe: 1.0, degats-groupe: {1: 0.4, 2: 0.7} } }",
+            "garde: { type: husk, combat: { niveau: 3, vie: 900, rang: elite, vie-groupe: 0.7 } }",
+            "seul: { type: husk, combat: { niveau: 1, vie: 50 } }",
+            "faux: { type: husk, combat: { niveau: 1, vie: 50, degats-groupe: {zero: 2, 0: 0.5} } }")));
+        pb.clear();
+        Combat passeur = DefinitionMob.lire("passeur", yg.getConfigurationSection("passeur"), pb).combat();
+        Combat garde = DefinitionMob.lire("garde", yg.getConfigurationSection("garde"), pb).combat();
+        Combat seul = DefinitionMob.lire("seul", yg.getConfigurationSection("seul"), pb).combat();
+        verifier(pb.isEmpty() && passeur.suitLeGroupe() && garde.suitLeGroupe() && !seul.suitLeGroupe(), "vie-groupe et degats-groupe lus");
+        verifier(Math.abs(passeur.vieAuNiveau(5) * passeur.facteurVie(1) - 12500) < 1e-6
+            && Math.abs(passeur.vieAuNiveau(5) * passeur.facteurVie(6) - 75000) < 1e-6, "Passeur : 12 500 seul, 75 000 à six");
+        verifier(passeur.facteurDegats(1) == 0.4 && passeur.facteurDegats(2) == 0.7 && passeur.facteurDegats(3) == 1
+            && passeur.facteurDegats(0) == 0.4 && seul.facteurDegats(1) == 1, "Passeur : dégâts × 0,4 seul, × 0,7 à deux, × 1 à trois");
+        verifier(Math.abs(garde.facteurVie(3) - 2.4) < 1e-9 && garde.facteurVie(1) == 1 && seul.facteurVie(6) == 1, "élite k = 0,7 : Vie × 2,4 à trois");
+        // temps pour le tuer : le même seul qu'à six (Vie × joueurs, dégâts des joueurs × joueurs)
+        double dps = 70;
+        verifier(Math.abs(passeur.vieAuNiveau(5) * passeur.facteurVie(1) / dps - passeur.vieAuNiveau(5) * passeur.facteurVie(6) / (6 * dps)) < 1e-6,
+            "Passeur : même durée seul qu'à six (" + Math.round(12500 / dps) + " s à " + (int) dps + " dégâts/s)");
+        CoupMob cp = CoupMob.deBase(passeur).fois(passeur.facteurDegats(1));
+        verifier(cp.multiplicateur() == 0.4 && CoupMob.deBase(passeur).fois(1).multiplicateur() == 1, "coup de base × 0,4 seul");
+        pb.clear();
+        DefinitionMob.lire("faux", yg.getConfigurationSection("faux"), pb);
+        verifier(pb.size() == 2, "degats-groupe mal écrit : signalé (" + pb.size() + ")");
+        verifier(Butin.estItem("item:e1_fleche_os") && Butin.estItem(" ITEM:arc ") && !Butin.estItem("vorace:e1_os_aventurier")
+            && !Butin.estItem("minecraft:bone"), "butin : lignes « item:<modèle> » reconnues");
+        YamlConfiguration yb = YamlConfiguration.loadConfiguration(new java.io.StringReader(
+            "archer: { type: skeleton, combat: { niveau: 2, vie: 160, butin: [ { objet: \"item:e1_fleche_os\", chance: 0.6, nombre: [3, 6] } ] } }"));
+        pb.clear();
+        Combat archer = DefinitionMob.lire("archer", yb.getConfigurationSection("archer"), pb).combat();
+        verifier(pb.isEmpty() && archer.butin().size() == 1 && archer.butin().get(0).objet().equals("item:e1_fleche_os")
+            && archer.butin().get(0).min() == 3 && archer.butin().get(0).max() == 6, "butin : ligne item: lue (flèches en os ×3-6)");
+
         System.out.println(echecs == 0 ? "TOUS LES TESTS PASSENT" : echecs + " ECHEC(S)");
         System.exit(echecs == 0 ? 0 : 1);
     }

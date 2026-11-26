@@ -75,6 +75,13 @@ final class IACombat {
         String mode = "garde", anim;
         double vitessePhase = 1, bonus = 1;
         BossBar barre;
+        /** Taille du groupe ({@code vie-groupe}, {@code degats-groupe}) : joueurs verrouillés dans ce combat. */
+        final Set<UUID> verrouilles = new HashSet<>();
+        /** Nombre de joueurs imposé par un autre plugin (arène d'un boss), 0 : compté par vorace-mob. */
+        int joueursImposes;
+
+        /** Joueurs comptés pour la Vie et les dégâts (1 au moins). */
+        int joueurs() { return Math.max(1, Math.max(joueursImposes, verrouilles.size())); }
     }
 
     /** Un projectile en vol, avec son modèle et la marque de son point d'impact. */
@@ -217,6 +224,7 @@ final class IACombat {
         if (alerte != null) { m.jouer(alerte, false); e.libreA = tic() + 14; }
         else e.libreA = tic() + 8;
         if (s.e instanceof Mob mob) { mob.getPathfinder().stopPathfinding(); regarder(mob, p.getLocation()); }
+        verrouiller(s, p);
         double r = s.d.combat().ia().entraide();
         if (r > 0) {
             for (Mobs.Suivi o : mobs.suivis()) {
@@ -228,6 +236,34 @@ final class IACombat {
         }
     }
 
+    /**
+     * Taille du groupe, à l'engagement : le joueur qui l'engage et tous les joueurs à {@link Combat#RAYON_GROUPE} blocs
+     * sont verrouillés ; la Vie maximale suit ({@link Combats#ajusterGroupe}).
+     */
+    private void verrouiller(Mobs.Suivi s, Player p) {
+        Combat c = s.d.combat();
+        if (!c.suitLeGroupe()) return;
+        s.ia.verrouilles.add(p.getUniqueId());
+        double r2 = Combat.RAYON_GROUPE * Combat.RAYON_GROUPE;
+        for (Player j : s.e.getWorld().getPlayers()) {
+            if (cibleValide(j, s.e) && j.getLocation().distanceSquared(s.e.getLocation()) <= r2) s.ia.verrouilles.add(j.getUniqueId());
+        }
+        mobs.combats().ajusterGroupe(s);
+    }
+
+    /** Un nouveau joueur qui le frappe en plein combat rejoint le groupe compté (+1 joueur). */
+    private void rejoindre(Mobs.Suivi s, Player p) {
+        if (!s.ia.engage || !s.d.combat().suitLeGroupe() || !s.ia.verrouilles.add(p.getUniqueId())) return;
+        mobs.combats().ajusterGroupe(s);
+    }
+
+    /** Un autre plugin impose le nombre de joueurs (arène d'un boss) ; 0 rend le comptage à vorace-mob. */
+    void imposerJoueurs(Mobs.Suivi s, int joueurs) {
+        if (s.ia == null) return;
+        s.ia.joueursImposes = Math.max(0, joueurs);
+        mobs.combats().ajusterGroupe(s);
+    }
+
     /** Fin du combat : il oublie tout, rentre chez lui et récupère sa Vie. */
     void rentrer(Mobs.Suivi s) {
         Etat e = s.ia;
@@ -235,6 +271,8 @@ final class IACombat {
         e.menace.clear(); e.horsVue.clear(); e.degats.clear(); e.prete.clear();
         e.cible = null; e.provocateur = null; e.enCours = null; e.engage = false; e.rentre = true; e.phase = 0;
         e.vitessePhase = 1; e.bonus = 1; e.enrage = false;
+        e.verrouilles.clear(); e.joueursImposes = 0;
+        mobs.combats().ajusterGroupe(s);   // retour à 1 joueur
         cacherBarre(s);
         retirerMarques(e);
         e.bondJusqua = 0;
@@ -966,7 +1004,7 @@ final class IACombat {
      * {@code part} : part des dégâts (1 pour le coup, moins pour une flaque).
      */
     void toucher(Mobs.Suivi s, Mob mob, Competence c, Player p, double part) {
-        CoupMob coup = CoupMob.de(s.d.combat(), s.niveau, c, s.ia.bonus * part);
+        CoupMob coup = CoupMob.de(s.d.combat(), s.niveau, c, s.ia.bonus * part * s.d.combat().facteurDegats(s.ia.joueurs()));
         s.coupEnCours = coup;
         s.sansAnimAuto = true;
         // le recul du jeu ne s'applique pas : un coup ne repousse que par son réglage « repousse » (plus bas)
@@ -1178,6 +1216,7 @@ final class IACombat {
     /** Un coup reçu d'un joueur (pour savoir s'il est pressé). */
     void coupRecu(Mobs.Suivi s, Player p) {
         if (s.ia == null) return;
+        rejoindre(s, p);
         s.ia.coups.addLast(tic());
         while (s.ia.coups.size() > 8) s.ia.coups.removeFirst();
     }
