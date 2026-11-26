@@ -431,23 +431,23 @@ public final class TestMobs {
             && archer.butin().get(0).min() == 3 && archer.butin().get(0).max() == 6, "butin : ligne item: lue (flèches en os ×3-6)");
 
         // mécaniques du bestiaire : garde de face, point faible, mort qui invoque, pantins
-        YamlConfiguration ym = YamlConfiguration.loadConfiguration(new java.io.StringReader(String.join("\n",
+        YamlConfiguration yMeca = YamlConfiguration.loadConfiguration(new java.io.StringReader(String.join("\n",
             "ossuaire: { type: skeleton, combat: { niveau: 2, vie: 200, garde: { reduction: 0.8, angle: 120, brise-apres: 3, ouverture: 20, animation: garde_brisee } } }",
             "meche: { type: husk, combat: { niveau: 3, vie: 300, point-faible: { partie: meche, dos: true, multiplicateur: 2, fige: 80 } } }",
             "mosaique: { type: skeleton, combat: { niveau: 1, vie: 100, a-la-mort: { invocation: e1_crane_qui_court, nombre: 1, depart: h_head } } }",
             "pantin: { type: zombie, combat: { niveau: 1, vie: 100, jamais-mortel: true } }")));
         pb.clear();
-        Mecaniques mo = DefinitionMob.lire("ossuaire", ym.getConfigurationSection("ossuaire"), pb).combat().meca();
-        Mecaniques mm = DefinitionMob.lire("meche", ym.getConfigurationSection("meche"), pb).combat().meca();
-        Mecaniques ms = DefinitionMob.lire("mosaique", ym.getConfigurationSection("mosaique"), pb).combat().meca();
-        Mecaniques mp = DefinitionMob.lire("pantin", ym.getConfigurationSection("pantin"), pb).combat().meca();
-        verifier(pb.isEmpty() && mo.garde() != null && mo.garde().briseApres() == 3 && mo.garde().reduction() == 0.8 && "garde_brisee".equals(mo.garde().animation())
+        Mecaniques mOss = DefinitionMob.lire("ossuaire", yMeca.getConfigurationSection("ossuaire"), pb).combat().meca();
+        Mecaniques mm = DefinitionMob.lire("meche", yMeca.getConfigurationSection("meche"), pb).combat().meca();
+        Mecaniques ms = DefinitionMob.lire("mosaique", yMeca.getConfigurationSection("mosaique"), pb).combat().meca();
+        Mecaniques mp = DefinitionMob.lire("pantin", yMeca.getConfigurationSection("pantin"), pb).combat().meca();
+        verifier(pb.isEmpty() && mOss.garde() != null && mOss.garde().briseApres() == 3 && mOss.garde().reduction() == 0.8 && "garde_brisee".equals(mOss.garde().animation())
             && mm.pointFaible() != null && mm.pointFaible().fige() == 80 && ms.aLaMort() != null && ms.aLaMort().mob().equals("e1_crane_qui_court")
             && mp.jamaisMortel() && seul.meca() == Mecaniques.AUCUNE, "mécaniques lues : garde, point faible, a-la-mort, jamais-mortel");
         // le mob regarde le sud (yaw 0 : +z) : un joueur au sud est devant, au nord dans son dos
         double devant = Mecaniques.angle(0, 0, 5), dos = Mecaniques.angle(0, 0, -5), cote = Mecaniques.angle(0, 5, 0), yaw90 = Mecaniques.angle(90, -5, 0);
         verifier(devant < 1 && dos > 179 && Math.abs(cote - 90) < 1 && yaw90 < 1, "angle vers l'attaquant : devant 0°, dos 180°, côté 90° (yaw 90 : regarde vers −x)");
-        verifier(mo.devant(devant) && mo.devant(55) && !mo.devant(65) && !mo.dos(dos) && mm.dos(dos) && mm.dos(125) && !mm.dos(100),
+        verifier(mOss.devant(devant) && mOss.devant(55) && !mOss.devant(65) && !mOss.dos(dos) && mm.dos(dos) && mm.dos(125) && !mm.dos(100),
             "garde sur 120° devant (60° de chaque côté) ; point faible dans le dos (au-delà de 120°)");
         // points d'apparition : chance, groupe, XP, butin, pauses, entraide
         YamlConfiguration ya = YamlConfiguration.loadConfiguration(new java.io.StringReader(String.join("\n",
