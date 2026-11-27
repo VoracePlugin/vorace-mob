@@ -229,7 +229,8 @@ e9_point_paroi: { mob: e9_paroi, monde: world, centre: [19.5, -60, 3.5], rayon: 
 APP
 cmd "vmob recharger"
 cmd "vmob invoquer e9_ronde"
-for k in 1 2 3 4 5 6 7 8; do sleep 2; cmd "vmob info e9_"; done
+# relevé chaque seconde : le mob de la paroi n'y reste collé que le temps que la fissure s'ouvre
+for k in $(seq 1 16); do sleep 1; cmd "vmob info e9_"; done
 # bestiaire (1.12.0) : l'essaim baisse les torches (torche d'âme) et les rallume en partant ; l'entité de quête est
 # invulnérable et fait sa ronde
 cmd "say ESSAI-E1-BESTIAIRE"
