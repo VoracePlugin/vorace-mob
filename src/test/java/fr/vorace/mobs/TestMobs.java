@@ -514,10 +514,9 @@ public final class TestMobs {
         java.util.UUID j9a = new java.util.UUID(0, 1), j9b = new java.util.UUID(0, 2), j9c = new java.util.UUID(0, 3);
         java.util.Map<java.util.UUID, Double> dg9 = java.util.Map.of(j9a, 900.0, j9b, 95.0, j9c, 5.0);
         verifier(Butin.membres(Combat.Rang.NORMAL, dg9, java.util.Map.of()).equals(List.of(j9a))
-            && Butin.membres(Combat.Rang.ELITE, dg9, java.util.Map.of()).size() == 1
-            && Butin.membres(Combat.Rang.ELITE, dg9, java.util.Map.of(j9c, 120.0)).containsAll(List.of(j9a, j9c))
-            && Butin.membres(Combat.Rang.BOSS, java.util.Map.of(j9a, 500.0, j9b, 500.0), java.util.Map.of()).size() == 2,
-            "butin de groupe : élites et boss, chaque membre à 10 % (dégâts + soins) ; monstre normal : le gagnant seul");
+            && Butin.membres(Combat.Rang.ELITE, dg9, java.util.Map.of(j9c, 120.0)).equals(List.of(j9a))
+            && Butin.membres(Combat.Rang.BOSS, java.util.Map.of(j9a, 500.0, j9b, 400.0), java.util.Map.of()).equals(List.of(j9a)),
+            "un seul butin par mob, au gagnant, même pour un élite ou un boss (pas de duplication)");
         Apparition ap9 = Apparition.lire("faucheuse", YamlConfiguration.loadConfiguration(new java.io.StringReader(
             "a: { mob: e1_faucheuse_errante, centre: [230.5, 41, 40.5], apparition: paroi, ronde: { points: [[230, 41], [229, 60]], arret: 300 } }")).getConfigurationSection("a"), pb);
         verifier(ap9.paroi() && ap9.ronde() != null && ap9.ronde().points().size() == 2 && !simple.paroi() && simple.ronde() == null,

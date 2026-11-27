@@ -158,28 +158,13 @@ final class Butin {
         return m == null || !m.isItem() ? null : new ItemStack(m, n);
     }
 
-    /** Part des contributions au-dessus de laquelle un membre tire sa table (élites, élites ++ et boss). */
-    static final double PART_MEMBRE = 0.10;
-
     /**
-     * Membres qui tirent leur table : pour un élite, un élite ++ ou un boss, chaque joueur qui a fait au moins 10 % des
-     * contributions (dégâts + soins et protections) ; sinon le seul gagnant (50,01 %). Le gagnant vient en premier.
+     * Qui tire la table : le seul gagnant (le plus de dégâts), quel que soit le rang. Un seul butin par mob, pour qu'un
+     * groupe n'en tire pas plusieurs (pas de duplication).
      */
     static List<UUID> membres(Combat.Rang rang, Map<UUID, Double> degats, Map<UUID, Double> soutiens) {
-        List<UUID> l = new ArrayList<>();
         UUID g = gagnant(degats);
-        if (g == null) return l;
-        l.add(g);
-        if (rang == Combat.Rang.NORMAL) return l;
-        Map<UUID, Double> total = new HashMap<>(degats);
-        soutiens.forEach((k, v) -> total.merge(k, Math.max(0, v), Double::sum));
-        double somme = 0;
-        for (double v : total.values()) somme += Math.max(0, v);
-        if (somme <= 0) return l;
-        for (Map.Entry<UUID, Double> x : total.entrySet()) {
-            if (!x.getKey().equals(g) && x.getValue() / somme >= PART_MEMBRE - 1e-9) l.add(x.getKey());
-        }
-        return l;
+        return g == null ? new ArrayList<>() : new ArrayList<>(List.of(g));
     }
 
     /**
@@ -233,7 +218,7 @@ final class Butin {
     }
 
     /**
-     * Mort d'un mob de combat : chaque membre qui y a droit tire sa table (le gagnant seul pour un monstre normal), puis
+     * Mort d'un mob de combat : le gagnant seul tire la table (un seul butin par mob), puis
      * l'événement, puis les objets réservés à chacun et l'XP du jeu au gagnant. Un mob relevé (sans butin) ne donne rien.
      */
     void mort(Mobs.Suivi s, Location ou) {

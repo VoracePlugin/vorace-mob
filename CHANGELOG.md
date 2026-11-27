@@ -2,6 +2,8 @@
 
 ## 1.11.0 (étage 1 de Babel : embuscades, invocations, soins d'allié, aura, neutres)
 
+- **Un seul butin par mob** (choix d'Antoine) : le butin par membre à 10 % de la 1.9.0 est retiré, il dupliquait le
+  butin des élites et des boss dans un groupe. Le gagnant seul tire la table ; `getButinDesMembres()` reste, vide.
 - **Embuscade** (`cache: { eveil: 3 }` d'un point d'apparition) : la vague due attend, cachée, qu'un joueur passe à 3
   blocs du point (en plus de son rayon), puis sort d'un coup avec son animation d'apparition (dépôts d'ossements et leurs
   Squelettes rampants). Vérifié toutes les 5 tics.

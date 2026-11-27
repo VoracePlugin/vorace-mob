@@ -14,8 +14,8 @@ import java.util.UUID;
  * Un mob de combat meurt. Le butin et l'XP vont au <b>gagnant</b> : le joueur qui a infligé au moins 50,01 % des dégâts,
  * sinon celui qui en a infligé le plus. Le butin tombe au sol, réservé au gagnant. Le plugin du combat du serveur peut
  * changer les objets, donner l'XP lui-même (écart de niveau, groupe) et couper l'XP du jeu ({@link #setXpDuJeu}).
- * <p>Élites, élites ++ et boss : chaque autre membre du combat qui a fait au moins 10 % des dégâts (ou des soins et
- * protections notés par {@link VoraceMobAPI#contribuer}) tire aussi sa table : {@link #getButinDesMembres}. Les pièces
+ * <p>Un seul butin par mob, au gagnant (pas de duplication) : {@link #getButinDesMembres} est vide depuis 1.11.0
+ * (gardé pour les plugins qui le lisent ; ce qu'on y met tombe encore pour ce joueur). Les pièces
  * prélevables du Chasseur ({@code butin-special} {@code chasseur: true}) ne tombent pas : {@link #getPiecesPrelevables}.
  */
 public final class VoraceMobMortEvent extends Event {

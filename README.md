@@ -86,8 +86,9 @@ mouton:
   l'événement de mort au lieu de tomber), `si: garde_brisee` (seulement si la condition a été notée pendant le combat ;
   `si: par_branche_coupee` : chance × le nombre de fois), `premier-kill: true` (une fois par joueur et par mob, gardé
   dans `donnees/premiers-kills.yml`).
-- **Butin de groupe** : élites, élites ++ et boss : chaque membre qui a fait au moins 10 % des dégâts (ou des soins et
-  protections, `VoraceMobAPI.contribuer`) tire sa table, réservée à lui. Monstres normaux : le gagnant (50,01 %) seul.
+- **Un seul butin par mob**, même pour un élite ou un boss : le gagnant (le plus de dégâts) tire la table, réservée à lui ;
+  pas de butin par membre (pas de duplication). `VoraceMobAPI.contribuer` (soins et protections) reste noté pour d'autres
+  usages.
 - **Butin** (`combat.butin`) : `objet: minecraft:bone`, `vorace:<objet>` (objet de vorace-core) ou `item:<modèle>`
   (arme, armure, munition de [vorace-item](https://github.com/VoracePlugin/vorace-item), à son rang de base et à une
   place tirée au hasard dans sa fourchette de stats ; ignoré sans vorace-item).
