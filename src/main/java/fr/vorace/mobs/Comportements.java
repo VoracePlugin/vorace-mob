@@ -50,7 +50,8 @@ final class Comportements {
 
     /** Vrai si ce mob court vers un tas d'os ({@code fuite}) : le cerveau de combat ne le mène pas. */
     boolean gere(Mobs.Suivi s) {
-        return s.d.combattant() && s.d.combat().meca().fuite() != null;
+        // le feu-follet (fuite sans relève) se bat : c'est le bestiaire qui le mène vers son cul-de-sac
+        return s.d.combattant() && s.d.combat().meca().fuite() != null && s.d.combat().meca().siArrive() != null;
     }
 
     // ================================================================== au calme (toutes les 0,5 s, près d'un joueur)
@@ -129,8 +130,12 @@ final class Comportements {
         for (Mobs.Suivi s : suivis) {
             if (!s.d.combattant() || !s.e.isValid()) continue;
             Mecaniques meca = s.d.combat().meca();
-            if (meca.dureeDeVie() > 0 && t - s.ne >= meca.dureeDeVie() && s.arrive < 0) { retirer.add(s); continue; }
-            if (meca.fuite() != null && s.e instanceof Mob mob) {
+            if (meca.dureeDeVie() > 0 && t - s.ne >= meca.dureeDeVie() && s.arrive < 0) {
+                try { mobs.bestiaire().finDeVie(s); } catch (Throwable ex) { plugin.getLogger().warning("fin de vie " + s.d.id() + " : " + ex); }
+                retirer.add(s);
+                continue;
+            }
+            if (meca.fuite() != null && meca.siArrive() != null && s.e instanceof Mob mob) {
                 if (courir(s, mob, meca, t)) retirer.add(s);
             }
         }

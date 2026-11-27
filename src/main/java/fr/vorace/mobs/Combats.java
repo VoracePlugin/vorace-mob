@@ -111,6 +111,8 @@ final class Combats {
      * {@code source} : le joueur qui frappe (menace et butin), ou null.
      */
     double infliger(Mobs.Suivi s, double montant, Player source) {
+        if (source != null) mobs.bestiaire().frappe(s);   // la Porte-Fardeau sort de l'eau
+        if (!mobs.bestiaire().contourne()) montant = mobs.bestiaire().recu(s, montant, source);   // parties, faiblesses...
         montant = mobs.ia().garde(s, montant, source);   // garde de face, point faible (bestiaire)
         s.compteTic = Bukkit.getCurrentTick();
         s.dernierCombat = System.currentTimeMillis();
@@ -125,6 +127,7 @@ final class Combats {
         }
         sauver(s);
         afficher(s);
+        if (s.vie > 0 && !mobs.bestiaire().contourne()) mobs.bestiaire().apresCoup(s, source);   // formes, Lame qui se rend
         if (!(s.e instanceof LivingEntity le)) return 0;
         double avant = le.getHealth();
         if (s.vie <= 0) return avant + 1;
@@ -181,6 +184,7 @@ final class Combats {
         if (e instanceof EntityDamageByEntityEvent ee) {
             if (ee.getDamager() instanceof Player p) source = p;
             else if (ee.getDamager() instanceof Projectile pr && pr.getShooter() instanceof Player p) source = p;
+            if (ee.getDamager() instanceof Projectile) Bestiaire.contexte(null, "distance");
         }
         double montant = e.getFinalDamage() * s.vieMax / SANTE;
         double jeu = infliger(s, montant, source);
@@ -425,6 +429,7 @@ final class Combats {
         String meca = (s.ia != null && s.ia.munitions >= 0 ? " munitions=" + s.ia.munitions : "") + (s.sansButin ? " sans-butin=oui" : "")
             + (s.rondeIndex >= 0 ? " ronde=" + s.rondeIndex : "") + (s.assis ? " assis=oui" : "")
             + (s.d.combat().meca().fuite() != null ? " fuite=" + (s.arrive >= 0 ? "arrive" : s.fuiteVers != null ? "en-route" : "aucune") : "");
-        return String.format(Locale.ROOT, " niveau=%d vie=%.0f/%.0f rang=%s", s.niveau, s.vie, s.vieMax, s.d.combat().rang().nom()) + groupe + ia + meca;
+        return String.format(Locale.ROOT, " niveau=%d vie=%.0f/%.0f rang=%s", s.niveau, s.vie, s.vieMax, s.d.combat().rang().nom()) + groupe + ia + meca
+            + (Bestiaire.actif == null ? "" : Bestiaire.actif.etatTexte(s));
     }
 }

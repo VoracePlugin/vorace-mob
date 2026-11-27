@@ -92,6 +92,20 @@ mouton:
 - **Butin** (`combat.butin`) : `objet: minecraft:bone`, `vorace:<objet>` (objet de vorace-core) ou `item:<modèle>`
   (arme, armure, munition de [vorace-item](https://github.com/VoracePlugin/vorace-item), à son rang de base et à une
   place tirée au hasard dans sa fourchette de stats ; ignoré sans vorace-item).
+- **Bestiaire de Babel** (1.12.0, clés du bloc `combat:`) : `parties` (sous-hitbox d'un os du modèle visé par le joueur :
+  coups pour la casser, `effet: coupe-aura` ou `un-tir-de-moins`, `multiplicateur` des coups qu'elle prend), `faiblesse`
+  (`distance`, `zone`, par type, `ramollit` : Défense ÷ 2), `figee-par: { types: [Water, Ice] }`, `point-faible.partie`,
+  `ouverture` (tête à découvert après chaque attaque), `lueur` (bloc de lumière qui suit un os), `eteint-lumiere` (torches et
+  lanternes autour passent à leur version d'âme, rallumées ensuite), `manger` (corps des mobs tombés), `perception:
+  mouvement` (accroupi et immobile : invisible), `sceau` (recollé de dos, accroupi), `regard` (solide seulement si on la
+  regarde, aveugle qui la fixe), `vision` (cône devant, moins derrière, accroupi), `cible: lumiere`, `sac` (le Glaneur
+  ramasse les objets perdus à la mort d'un joueur ; tué, il les rend ; troc), `offrande` et `invincible` (Lame-orpheline),
+  `leurre` (ballot), `tete-lanterne` et `lanterne-posee` (parties détachées du Passeur), `formes` et `recomposition`
+  (Armure veuve), `rotation`, `hitbox-basse`, `fin-de-vie`. Attaques : `colle`, `trajectoire: droite`, `sautable`,
+  `cibles-min`, `appel`, `apres-jeu`, `branches`, `si`, `seulement-hors-regard`, `fragment-d-ame`, `immunite-projectiles`,
+  `contre-paroi`, `centre: lanterne`, `sacrifice`, `evenement-interrompu`, `evenement-ratee`. Entités de quête (racine du
+  mob) : `invulnerable`, `regard`, `vu` (événement, repousse vers un point), `ronde` (blocs/s), `duree-de-vie`.
+  Événement `VoraceMobEvenementEvent` (joueur, mob, clé) : le plugin des quêtes le compte.
 - **Joueurs en créatif** : ils comptent comme les autres pour faire vivre les mobs et les effrayer (oiseaux,
   lapins...), mais ne sont jamais attaqués. Seuls les spectateurs et les joueurs invisibles sont ignorés.
 - **IA** : `ia: vorace` (le cerveau remplace l'IA de déplacement du jeu), `ia: jeu` (l'IA du jeu, gardée en laisse :
@@ -102,8 +116,9 @@ mouton:
   chaque mob son action, ses besoins, sa distance à la maison et la distance parcourue depuis son apparition (depuis la console,
   le nom d'un joueur relève les mobs autour de lui).
 - API : `fr.vorace.mobs.VoraceMobAPI` (`invoquerMob`, `mobVorace`, `actionMob`, `effrayerMob` ; combat : `stat`, `vie`, `infliger`, `coupEnCours`,
-  `joueursDuCombat`, `imposerJoueurs`, `noterCondition`, `contribuer`, `munitions`, `retirerMunitions`, `sansButin`...) ; événement
-  `fr.vorace.mobs.VoraceMobActionEvent` à chaque changement d'action.
+  `joueursDuCombat`, `imposerJoueurs`, `noterCondition`, `contribuer`, `munitions`, `retirerMunitions`, `sansButin`,
+  `infliger(entite, montant, source, type, nature)`, `visiblePour`, `fragmentsAme`...) ; événements
+  `fr.vorace.mobs.VoraceMobActionEvent` à chaque changement d'action et `VoraceMobEvenementEvent` (bestiaire).
 
 ## Installation
 

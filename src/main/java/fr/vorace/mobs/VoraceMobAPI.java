@@ -89,7 +89,11 @@ public final class VoraceMobAPI {
     /** Stat du mob de combat (« resistance », « puissance_phys »...), 0 si elle n'est pas écrite. */
     public static double stat(Entity e, String cle) {
         Mobs.Suivi s = combattant(e);
-        return s == null ? 0 : s.definition().combat().stat(cle, s.niveau);
+        if (s == null) return 0;
+        double v = s.definition().combat().stat(cle, s.niveau);
+        // ramolli par le feu (Cierge-errant, faiblesse.ramollit) : Défense physique ÷ 2
+        if (("resistance".equals(cle) || "armure".equals(cle)) && plugin.mobs().bestiaire().ramolli(s)) v *= 0.5;
+        return v;
     }
 
     /** Toutes les stats écrites du mob de combat (vide si ce n'en est pas un). */
@@ -123,6 +127,51 @@ public final class VoraceMobAPI {
     public static double infliger(Entity e, double montant, Entity source) {
         Mobs.Suivi s = combattant(e);
         return s == null ? -1 : plugin.mobs().combats().infliger(s, montant, source instanceof Player p ? p : null);
+    }
+
+    /**
+     * Comme {@link #infliger(Entity, double, Entity)}, en disant ce qu'est le coup : {@code type} de dégâts (« Fire »,
+     * « Water »...) et {@code nature} (« melee », « distance » ou « zone »). Le bestiaire s'en sert : faiblesses
+     * (Feu-follet aux tirs, Phalène aux zones, Cierge au Feu), Moulière figée par l'Eau ou la Glace, tirs déviés.
+     */
+    public static double infliger(Entity e, double montant, Entity source, String type, String nature) {
+        Mobs.Suivi s = combattant(e);
+        if (s == null) return -1;
+        Bestiaire.contexte(type, nature);
+        return plugin.mobs().combats().infliger(s, montant, source instanceof Player p ? p : null);
+    }
+
+    /**
+     * Le mob n'est vu que de ces joueurs (monstre de quête propre à un joueur et à son groupe) : son entité, sa barre de
+     * Vie et son modèle animé. Vrai si c'est fait.
+     */
+    public static boolean visiblePour(Entity e, java.util.Collection<Player> joueurs) {
+        Mobs m = mobs();
+        Mobs.Suivi s = m == null ? null : m.suivi(e);
+        if (s == null) return false;
+        java.util.Set<java.util.UUID> ids = new java.util.HashSet<>();
+        for (Player p : joueurs) ids.add(p.getUniqueId());
+        java.util.List<Entity> morceaux = new java.util.ArrayList<>();
+        morceaux.add(e);
+        morceaux.addAll(e.getPassengers());
+        for (Player o : org.bukkit.Bukkit.getOnlinePlayers()) {
+            if (ids.contains(o.getUniqueId())) continue;
+            for (Entity x : morceaux) o.hideEntity(plugin, x);
+        }
+        if (plugin.modeles() != null) {
+            fr.vorace.modeles.Modeles.Instance i = plugin.modeles().instance(e);
+            if (i != null) i.visiblePour(joueurs);
+        }
+        return true;
+    }
+
+    /**
+     * Fragments d'âme du joueur (Fauchage de la Faucheuse errante) : part de Vie maximale perdue, négative (−0,1 par
+     * fragment, 3 au plus), 0 sans fragment. Le plugin du combat l'applique à la Vie maximale.
+     */
+    public static double fragmentsAme(Player p) {
+        Mobs m = mobs();
+        return m == null || p == null ? 0 : m.bestiaire().fragments(p);
     }
 
     /** Nom affiché du mob (« Mèche-sourde »), ou null si ce n'est pas un mob de Vorace. */

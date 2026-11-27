@@ -64,6 +64,7 @@ import java.util.Locale;
  *   soin-allie: { cible: cire, seuil: 0.3, soin: 0.4 }   # soigne un allié de cette famille (combat.famille) sous 30 % de
  *                            # Vie, à sa portée, de 40 % de sa Vie ; seulement s'il y en a un
  *   interrompu-par: 2        # 2 coups reçus pendant le signal l'interrompent
+ *   # et les réglages du bestiaire ({@link Speciaux.Attaque}) : colle, trajectoire, sautable, cibles-min, appel...
  * </pre>
  */
 public record Competence(String id, String nom, String animation, Forme forme, double porteeMin, double porteeMax,
@@ -73,7 +74,8 @@ public record Competence(String id, String nom, String animation, Forme forme, d
                          int phase, double vitesse, double anticipation, int salve, int intervalle, int zones,
                          double dispersion, double repousse, double bond, int flaque, double flaqueMult, Effets effets,
                          int presse, boolean lourde, int animationFrappe, SecondCoup secondCoup, boolean munitions,
-                         boolean rechargeMunitions, Invocation invocation, int phaseMax, SoinAllie soinAllie, int interrompuPar) {
+                         boolean rechargeMunitions, Invocation invocation, int phaseMax, SoinAllie soinAllie, int interrompuPar,
+                         Speciaux.Attaque sp) {
 
     /** Mobs qui naissent autour de lui au coup ({@code max} en même temps, {@code total} sur le combat ; 0 : sans limite). */
     public record Invocation(String mob, int nombre, int max, int total) {
@@ -241,6 +243,7 @@ public record Competence(String id, String nom, String animation, Forme forme, d
             s.isBoolean("munitions") ? s.getBoolean("munitions") : s.getInt("munitions", 0) > 0,
             s.isBoolean("apres-munitions") ? s.getBoolean("apres-munitions") : s.getInt("apres-munitions", 0) > 0,
             Invocation.lire(s.getConfigurationSection("invocation")), s.contains("phase-max") ? Math.max(0, s.getInt("phase-max")) : -1,
-            SoinAllie.lire(s.getConfigurationSection("soin-allie")), Math.max(0, s.getInt("interrompu-par", 0)));
+            SoinAllie.lire(s.getConfigurationSection("soin-allie")), Math.max(0, s.getInt("interrompu-par", 0)),
+            Speciaux.Attaque.lire(s));
     }
 }

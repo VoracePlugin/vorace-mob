@@ -98,6 +98,8 @@ final class IACombat {
         /** Mobs invoqués par ses attaques pendant ce combat ; purifié (aura éteinte) jusqu'à ce tic. */
         int invoques;
         long purifieJusqua;
+        /** Animation de l'attaque en cours (une branche par tir : {@link Bestiaire#animationAttaque}). */
+        String animAttaque;
 
         /** Joueurs comptés pour la Vie et les dégâts (1 au moins). */
         int joueurs() { return Math.max(1, Math.max(joueursImposes, verrouilles.size())); }
@@ -247,7 +249,7 @@ final class IACombat {
         else if (alerte != null) { m.jouer(alerte, false); e.libreA = tic() + 14; }
         else e.libreA = tic() + 8;
         Mecaniques.Munitions mu = s.d.combat().meca().munitions();
-        e.munitions = mu == null ? -1 : mu.nombre();
+        e.munitions = mu == null ? -1 : mobs.bestiaire().munitionsMax(s, mu.nombre());
         if (s.e instanceof Mob mob) { mob.getPathfinder().stopPathfinding(); regarder(mob, p.getLocation()); }
         verrouiller(s, p);
         Apparition app = mobs.apparition(s.apparition);
@@ -332,7 +334,7 @@ final class IACombat {
         if (s.ia == null) return false;
         if (s.ia.engage || s.ia.rentre) return true;
         if (!(s.e instanceof Mob mob) || s.vie <= 0) return false;
-        if (s.d.neutre()) return false;   // neutre : il n'attaque que si on le frappe
+        if (s.d.neutre() || mobs.bestiaire().dormant(s)) return false;   // neutre : il n'attaque que si on le frappe
         double r = s.d.combat().ia().aggro();
         Player meilleur = null;
         double best = r * r;
@@ -340,7 +342,7 @@ final class IACombat {
         for (Player p : s.e.getWorld().getPlayers()) {
             if (!cibleValide(p, s.e) || p.isInvisible()) continue;
             double d = p.getLocation().distanceSquared(l);
-            if (d < best && mob.hasLineOfSight(p)) { best = d; meilleur = p; }
+            if (d < best && mob.hasLineOfSight(p) && mobs.bestiaire().percoit(s, p, Math.sqrt(d))) { best = d; meilleur = p; }
         }
         if (meilleur == null) return false;
         ajouterMenace(s, meilleur, 10);
@@ -400,7 +402,7 @@ final class IACombat {
             if (best < va * seuil) meilleur = e.cible;
         }
         e.cible = meilleur;
-        return Bukkit.getPlayer(meilleur);
+        return mobs.bestiaire().preferer(s, Bukkit.getPlayer(meilleur));
     }
 
     // ================================================================== garde et point faible (bestiaire)
@@ -414,8 +416,10 @@ final class IACombat {
         if (s.ia == null || source == null || (m.garde() == null && m.pointFaible() == null)) return montant;
         Location ml = s.e.getLocation(), pl = source.getLocation();
         double angle = Mecaniques.angle(regardMob(s), pl.getX() - ml.getX(), pl.getZ() - ml.getZ());
-        if (m.dos(angle)) {
+        Speciaux.PointFaiblePartie pfp = m.sp().pointFaiblePartie();
+        if (m.dos(angle) && (pfp == null || mobs.bestiaire().partieTouchee(s, pfp.partie()))) {
             if (m.pointFaible().fige() > 0) entraver(s, m.pointFaible().fige() * 50L, false, false);
+            if (pfp != null) mobs.bestiaire().pointFaibleTouche(s, source);
             return montant * m.pointFaible().multiplicateur();
         }
         if (!m.devant(angle) || tic() < s.ia.gardeBriseeJusqua) return montant;
@@ -801,6 +805,7 @@ final class IACombat {
             if (a.rechargeMunitions() || (a.munitions() && e.munitions == 0)) continue;
             if (a.phaseMax() >= 0 && e.phase > a.phaseMax()) continue;
             if (a.invocation() != null && !peutInvoquer(e, a.invocation())) continue;
+            if (!mobs.bestiaire().attaquePossible(s, a, cible, d)) continue;
             if (a.soinAllie() != null) {
                 // soin d'un allié : seulement s'il y en a un à soigner, à sa portée (la cible joueur ne compte pas)
                 if (allieABlesse(s, a) == null) continue;
@@ -903,7 +908,7 @@ final class IACombat {
                 e.visee = c0;
             }
             case CERCLE -> {
-                e.visee = sol(l);
+                e.visee = sol(mobs.bestiaire().centre(s, c, l));   // centre: lanterne (Passeur)
                 e.zones.add(e.visee);
             }
             case CONE, LIGNE -> e.visee = sol(l);
@@ -923,11 +928,12 @@ final class IACombat {
             }
         }
         e.animA = 0;
+        e.animAttaque = mobs.bestiaire().animationAttaque(s, c);
         if (m != null) {
-            if (c.animation() != null && m.modele().animations().containsKey(c.animation())) {
+            if (e.animAttaque != null && m.modele().animations().containsKey(e.animAttaque)) {
                 // geste retardé : il frappe à la fin du signal, quand le coup touche
                 if (c.departAnimation() > 0) e.animA = t + c.departAnimation();
-                else m.jouer(c.animation(), false);
+                else m.jouer(e.animAttaque, false);
             } else if (c.forme() == Competence.Forme.CONTACT) m.jouerAuto("attaque");
         }
         if (c.annonce() != null) annoncer(s, c.annonce());
@@ -955,7 +961,7 @@ final class IACombat {
         if (!cibleValide(vise, mob)) vise = cible;
         if (e.animA > 0 && t >= e.animA) {
             e.animA = 0;
-            if (m != null && c.animation() != null && m.modele().animations().containsKey(c.animation())) m.jouer(c.animation(), false);
+            if (m != null && e.animAttaque != null && m.modele().animations().containsKey(e.animAttaque)) m.jouer(e.animAttaque, false);
         }
         boolean bond = t < e.bondJusqua;
         if (!bond) arreter(mob);
@@ -1003,7 +1009,7 @@ final class IACombat {
             e.prete.put(c.id(), e.t0 + Math.max(c.recharge(), c.total()));
             if (c.rechargeMunitions() && s.d.combat().meca().munitions() != null) {
                 // recharge finie : toutes ses munitions, et il cherchera un autre dépôt la prochaine fois
-                e.munitions = s.d.combat().meca().munitions().nombre();
+                e.munitions = mobs.bestiaire().munitionsMax(s, s.d.combat().meca().munitions().nombre());
                 e.depot = null;
                 e.depotCherche = false;
             }
@@ -1243,6 +1249,21 @@ final class IACombat {
                 w.playSound(l, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 0.9f, 0.5f);
             }
         }
+        if (k == 0) mobs.bestiaire().apresExecution(s, mob, c, vise);
+    }
+
+    /** Son attaque joue sur place, d'un coup (fin de vie de l'âme enragée) : tous les joueurs dans son cercle sont touchés. */
+    void exploser(Mobs.Suivi s, Mob mob, Competence c) {
+        if (s.ia == null) return;
+        Location l = mob.getLocation();
+        double r = Math.max(c.rayon(), 1);
+        for (Player p : l.getWorld().getPlayers()) {
+            if (!cibleValide(p, mob) || p.getLocation().distanceSquared(l) > r * r || Math.abs(p.getLocation().getY() - l.getY()) >= 2.5) continue;
+            toucher(s, mob, c, p, 1);
+        }
+        fx(c.effets().impact(), l, hasard.nextFloat() * 360, "impact", r);
+        l.getWorld().spawnParticle(Particle.SOUL_FIRE_FLAME, l.clone().add(0, 0.8, 0), 40, r / 2, 0.4, r / 2, 0.05);
+        l.getWorld().playSound(l, Sound.ENTITY_GENERIC_EXPLODE, 0.8f, 1.4f);
     }
 
     /**
@@ -1257,7 +1278,7 @@ final class IACombat {
         Location b = sol(predire(vise, duree, ant));
         double dist = a.distance(b);
         duree = (int) Math.max(4, Math.min(40, Math.round(dist / c.vitesse())));
-        Projectile p = new Projectile(s, c, a.toVector(), b.toVector().add(new Vector(0, 0.1, 0)), 0.4 + dist * 0.07, duree);
+        Projectile p = new Projectile(s, c, a.toVector(), b.toVector().add(new Vector(0, 0.1, 0)), c.sp().droite() ? 0.05 : 0.4 + dist * 0.07, duree);
         Vector dir = b.toVector().subtract(a.toVector()).setY(0);
         p.fx = fx(c.effets().projectile(), a, dir.lengthSquared() > 1e-4 ? yaw(dir) : 0, "vol", Math.max(0.8, c.rayon() / 1.5));
         p.marque = marqueFx(c, b, c.rayon(), duree, 0);
@@ -1270,6 +1291,7 @@ final class IACombat {
      * {@code part} : part des dégâts (1 pour le coup, moins pour une flaque).
      */
     void toucher(Mobs.Suivi s, Mob mob, Competence c, Player p, double part) {
+        if (Bestiaire.saute(c, p)) { p.sendActionBar(Messages.mini("<green>Sauté !")); return; }   // attaque basse sautée
         CoupMob coup = CoupMob.de(s.d.combat(), s.niveau, c, s.ia.bonus * part * s.d.combat().facteurDegats(s.ia.joueurs()) * aura(s));
         s.coupEnCours = coup;
         s.sansAnimAuto = true;
@@ -1282,6 +1304,7 @@ final class IACombat {
             s.coupEnCours = null;
             s.sansAnimAuto = false;
         }
+        mobs.bestiaire().touche(s, c, p);
         if (c.repousse() > 0 && part >= 1) sansRecul.remove(p.getUniqueId());
         if (c.repousse() > 0 && part >= 1 && p.isValid() && !p.isDead()) {
             Vector v = p.getLocation().toVector().subtract(mob.getLocation().toVector()).setY(0);
@@ -1496,6 +1519,7 @@ final class IACombat {
             if (m != null && c.animation() != null && c.animation().equals(m.animation())) m.arreterAnimation();
             s.e.getWorld().playSound(s.e.getLocation(), Sound.BLOCK_FIRE_EXTINGUISH, 1f, 1f);
             noter(s, "interrompu_" + c.id(), 1);
+            mobs.bestiaire().evenement(p, s, c.sp().evenementInterrompu());
         }
     }
 

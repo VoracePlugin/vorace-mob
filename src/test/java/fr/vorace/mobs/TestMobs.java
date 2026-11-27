@@ -563,6 +563,61 @@ public final class TestMobs {
             "a: { mob: e1_squelette_rampant, centre: [122.5, 40, 298.5], cache: { eveil: 3 } }")).getConfigurationSection("a"), pb);
         verifier(ap11.eveil() == 3 && simple.eveil() == 0, "embuscade : la vague attend un joueur à 3 blocs");
 
+        // 1.12.0 : comportements du bestiaire (lecture)
+        YamlConfiguration y12 = YamlConfiguration.loadConfiguration(new java.io.StringReader(String.join("\n",
+            "meche: { type: husk, combat: { niveau: 4, vie: 552, cible: lumiere, munitions: { nombre: 3 },",
+            "  parties: { branches: { os: [branche], nombre: 3, coups: 3, effet: un-tir-de-moins, condition: par_branche_coupee } },",
+            "  competences: { tir: { forme: projectile, portee: [4, 16], branches: [a, b, c], munitions: 3 },",
+            "    barrage: { forme: projectile, si: [branche_coupee, dernier_du_groupe], trajectoire: droite } } } }",
+            "sauteur: { type: husk, combat: { niveau: 2, vie: 330, perception: mouvement, sceau: { dos: 20, fige: 600, degats-dos: 1.5, evenement: e1.sceau_recolle } } }",
+            "cierge: { type: husk, combat: { niveau: 2, vie: 340, point-faible: { partie: meche, dos: true, multiplicateur: 2, fige: 80, evenement: e1.meche_eteinte },",
+            "  faiblesse: { Fire: 1.5, ramollit: 100 } } }",
+            "attentive: { type: husk, combat: { niveau: 4, vie: 1720, regard: { solide-si-regardee: true, aveugle-apres: 80, aveuglement: 40 },",
+            "  competences: { griffe: { forme: contact, portee: 2.5, seulement-hors-regard: true } } } }",
+            "faucheuse: { type: husk, combat: { niveau: 5, vie: 13900, vision: { devant: 12, derriere: 5, angle: 120, accroupi: 0.5 },",
+            "  competences: { fauchage: { forme: cone, rayon: 4, fragment-d-ame: { vie-max: -0.1, duree: 300, cumul: 3 } } } } }",
+            "passeur: { type: husk, combat: { niveau: 5, vie: 12500, tete-lanterne: { vie: 0.06, aveugle: 120, reforme: 400, degats-recus: 1.2 },",
+            "  lanterne-posee: { phase: 2, vie: 0.25, reduction-corps: 0.8 },",
+            "  competences: { charge: { forme: ligne, rayon: 12, contre-paroi: 60 }, garde: { forme: cercle, rayon: 4, centre: lanterne } } } }",
+            "veuve: { type: husk, combat: { niveau: 6, vie: 20600, formes: [0.5, 0.3, 0.2], recomposition: { duree: 60, piece-cassee-a: 0.08, perte-vie: 0.25, perte-degats: 0.1 } } }",
+            "glaneur: { type: husk, neutre: true, combat: { niveau: 4, vie: 1590, sac: { ramasse-apres: 600, sacs-max: 2, troc: true, evenement: e1.troc_glaneur } } }",
+            "lame: { type: husk, neutre: true, combat: { niveau: 3, vie: 850, invincible: { se-rend-a: 1 }, offrande: { interaction: 60, refus-max: 3, objet: vorace:e1_lame_orpheline } } }",
+            "fantome: { type: husk, ia: aucune, invulnerable: true, ronde: { points: [[236, 73], [200, 90]], vitesse: 3, boucle: false },",
+            "  regard: { angle: 120, portee: 12, portee-accroupi: 6, ligne-de-vue: true }, vu: { signal: 20, repousse: 6, vers: le_fil, evenement: e1.faucheuse_vu }, duree-de-vie: 1400 }")));
+        pb.clear();
+        Combat me12 = DefinitionMob.lire("meche", y12.getConfigurationSection("meche"), pb).combat();
+        Speciaux.Mob sme = me12.meca().sp();
+        Competence tir12 = me12.competences().stream().filter(x -> x.id().equals("tir")).findFirst().get();
+        Competence bar12 = me12.competences().stream().filter(x -> x.id().equals("barrage")).findFirst().get();
+        verifier(pb.isEmpty() && sme.cibleLumiere() && sme.parties().get("branches").coups() == 3 && "un-tir-de-moins".equals(sme.parties().get("branches").effet())
+            && sme.partieDeLOs("branche_haute") != null && tir12.sp().branches().size() == 3 && bar12.sp().si().size() == 2 && bar12.sp().droite()
+            && Bestiaire.lumiere(org.bukkit.Material.TORCH) == 14 && Bestiaire.lumiere(org.bukkit.Material.STONE) == 0,
+            "Mèche-sourde : cible la lumière, branches (parties), une animation par tir, barrage si branche coupée, tir tendu");
+        Speciaux.Mob ssa = DefinitionMob.lire("sauteur", y12.getConfigurationSection("sauteur"), pb).combat().meca().sp();
+        Speciaux.Mob sci = DefinitionMob.lire("cierge", y12.getConfigurationSection("cierge"), pb).combat().meca().sp();
+        Combat at12 = DefinitionMob.lire("attentive", y12.getConfigurationSection("attentive"), pb).combat();
+        Combat fa12 = DefinitionMob.lire("faucheuse", y12.getConfigurationSection("faucheuse"), pb).combat();
+        verifier(ssa.perceptionMouvement() && ssa.sceau().fige() == 600 && "e1.sceau_recolle".equals(ssa.sceau().evenement())
+            && "meche".equals(sci.pointFaiblePartie().partie()) && sci.faiblesse().types().get("fire") == 1.5 && sci.faiblesse().ramollit() == 100
+            && at12.meca().sp().regard().aveugleApres() == 80 && at12.competences().get(0).sp().horsRegard()
+            && fa12.meca().sp().vision().derriere() == 5 && fa12.competences().get(0).sp().fragment().cumul() == 3,
+            "Sauteur (mouvement, sceau), Cierge (mèche, feu), Attentive (regard), Faucheuse (vision, fragment d'âme)");
+        Combat pa12 = DefinitionMob.lire("passeur", y12.getConfigurationSection("passeur"), pb).combat();
+        Speciaux.Mob sve = DefinitionMob.lire("veuve", y12.getConfigurationSection("veuve"), pb).combat().meca().sp();
+        Speciaux.Mob sgl = DefinitionMob.lire("glaneur", y12.getConfigurationSection("glaneur"), pb).combat().meca().sp();
+        Speciaux.Mob sla = DefinitionMob.lire("lame", y12.getConfigurationSection("lame"), pb).combat().meca().sp();
+        verifier(pa12.meca().sp().teteLanterne().degatsRecus() == 1.2 && pa12.meca().sp().lanternePosee().phase() == 2
+            && pa12.competences().stream().anyMatch(x -> x.sp().contreParoi() == 60) && pa12.competences().stream().anyMatch(x -> "lanterne".equals(x.sp().centre()))
+            && sve.formes().size() == 3 && sve.recomposition().pieceCasseeA() == 0.08 && sgl.sac().sacsMax() == 2
+            && sla.invincible().seRendA() == 1 && sla.offrande().refusMax() == 3,
+            "Passeur (tête-lanterne, lanterne posée, charge contre paroi), Armure veuve (formes), Glaneur (sac), Lame-orpheline (offrande)");
+        DefinitionMob fan12 = DefinitionMob.lire("fantome", y12.getConfigurationSection("fantome"), pb);
+        verifier(pb.isEmpty() && fan12.quete().invulnerable() && fan12.quete().ronde().points().size() == 2 && fan12.quete().regard().porteeAccroupi() == 6
+            && fan12.quete().vu().repousse() == 6 && "e1.faucheuse_vu".equals(fan12.quete().vu().evenement()) && fan12.quete().dureeDeVie() == 1400,
+            "entité de quête : invulnérable, ronde, regard, vu (repousse vers le Fil), durée de vie");
+        verifier(DefinitionMob.lire("glaneur", y12.getConfigurationSection("glaneur"), pb).quete() == Speciaux.Quete.AUCUNE
+            && simple.toString() != null, "un mob de combat n'est pas une entité de quête");
+
         System.out.println(echecs == 0 ? "TOUS LES TESTS PASSENT" : echecs + " ECHEC(S)");
         System.exit(echecs == 0 ? 0 : 1);
     }

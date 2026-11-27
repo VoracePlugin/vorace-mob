@@ -107,6 +107,10 @@ e9_tireur: { type: pillager, caractere: agressif, activite: toujours, silencieux
 e9_paroi: { type: vindicator, caractere: agressif, activite: toujours, silencieux: true, combat: { niveau: 1, vie: 100, ia: { aggro: 2 }, coup-de-base: false } }
 e9_ronde: { type: vindicator, caractere: agressif, activite: toujours, silencieux: true, combat: { niveau: 1, vie: 100, ia: { aggro: 0 }, coup-de-base: false,
   ronde: { points: [[-6, -14], [-6, -24]], arret: 20 } } }
+e9_essaim: { type: endermite, caractere: agressif, activite: toujours, silencieux: true, combat: { niveau: 1, vie: 100, ia: { aggro: 0 }, coup-de-base: false,
+  eteint-lumiere: { rayon: 6, niveaux: 4 }, faiblesse: { zone: 1.5 } } }
+e9_fantome: { type: zombie, ia: aucune, silencieux: true, invulnerable: true, ronde: { points: [[40.5, 40.5], [40.5, 52.5]], vitesse: 4, boucle: false },
+  regard: { angle: 120, portee: 12, portee-accroupi: 6 }, vu: { evenement: e9.vu } }
 E1
 echo "eula=true" > eula.txt
 cat > server.properties <<PROPS
@@ -226,6 +230,22 @@ APP
 cmd "vmob recharger"
 cmd "vmob invoquer e9_ronde"
 for k in 1 2 3 4 5 6 7 8; do sleep 2; cmd "vmob info e9_"; done
+# bestiaire (1.12.0) : l'essaim baisse les torches (torche d'âme) et les rallume en partant ; l'entité de quête est
+# invulnérable et fait sa ronde
+cmd "say ESSAI-E1-BESTIAIRE"
+cmd "setblock 30 -60 30 torch"
+cmd "vmob invoquer e9_essaim"
+cmd "vmob invoquer e9_fantome"
+sleep 1
+cmd "tp @e[type=endermite,limit=1] 30 -60 32"
+cmd "tp @e[type=zombie,limit=1] 40.5 -60 40.5"
+sleep 3
+cmd "execute if block 30 -60 30 minecraft:soul_torch run say ETEINT-OUI"
+cmd "damage @e[type=zombie,limit=1] 50 minecraft:generic"
+cmd "kill @e[type=endermite]"
+sleep 3
+cmd "execute if block 30 -60 30 minecraft:torch run say RALLUME-OUI"
+cmd "vmob info e9_fantome"
 cmd "say ESSAI-E1-FIN"
 wait $BOT
 sleep 1
@@ -285,7 +305,8 @@ if grep -ao 'maison=[0-9.]*/[0-9]*' journal.txt | awk -F'[=/]' '$2 > $3 + 2 {bad
 echo "===== Étage 1 de Babel (1.9.0)"
 CRANE=$(phase 'ESSAI-E1-CRANE' 'ESSAI-E1-MUNITIONS' | grep -a 'mob=e9_')
 MUNI=$(phase 'ESSAI-E1-MUNITIONS' 'ESSAI-E1-PAROI' | grep -a 'mob=e9_tireur')
-PAROI=$(phase 'ESSAI-E1-PAROI' 'ESSAI-E1-FIN' | grep -a 'mob=e9_')
+PAROI=$(phase 'ESSAI-E1-PAROI' 'ESSAI-E1-BESTIAIRE' | grep -a 'mob=e9_')
+BEST=$(phase 'ESSAI-E1-BESTIAIRE' 'ESSAI-E1-FIN')
 echo "crâne qui court :"; echo "$CRANE"
 echo "munitions :"; echo "$MUNI" | grep -ao 'mode=[a-z]* .*munitions=[0-9]*' | sed 's/ effets=.*munitions=/ munitions=/'
 echo "paroi et ronde :"; echo "$PAROI" | grep -ao 'mob=e9_[a-z]* .*pos=[-0-9.,]*\|ronde=[0-9]*' | head -20
@@ -302,4 +323,9 @@ echo "$MUNI" | grep -aq 'mode=depot' || { echo "ECHEC : le tireur ne marche pas 
 echo "$PAROI" | grep -aq 'mob=e9_paroi' || { echo "ECHEC : rien ne sort de la paroi"; exit 1; }
 echo "$PAROI" | grep -ao 'mob=e9_paroi .*pos=[-0-9.]*' | grep -aqE 'pos=21\.' || { echo "ECHEC : le mob de la paroi n'est pas collé à la paroi (x = 21,5)"; exit 1; }
 [ "$(echo "$PAROI" | grep -ao 'mob=e9_ronde .*ronde=[0-9]*' | grep -ao 'ronde=[0-9]*' | sort -u | wc -l)" -ge 2 ] || { echo "ECHEC : la ronde ne passe pas d'un point à l'autre"; exit 1; }
+echo "bestiaire :"; echo "$BEST" | grep -a 'OUI\|mob=e9_fantome' | head -5
+echo "$BEST" | grep -a 'ETEINT-OUI' | grep -avq 'execute' || { echo "ECHEC : l'essaim n'a pas baissé la torche"; exit 1; }
+echo "$BEST" | grep -a 'RALLUME-OUI' | grep -avq 'execute' || { echo "ECHEC : la torche n'est pas rallumée après l'essaim"; exit 1; }
+echo "$BEST" | grep -aq 'mob=e9_fantome' || { echo "ECHEC : l'entité de quête invulnérable est morte"; exit 1; }
+echo "$BEST" | grep -ao 'mob=e9_fantome .*pos=[-0-9.,]*' | grep -aqE 'pos=40\.[0-9]+,-?[0-9.]+,(4[4-9]|5[0-2])\.' || { echo "ECHEC : l'entité de quête ne fait pas sa ronde"; exit 1; }
 echo "ESSAI REUSSI"

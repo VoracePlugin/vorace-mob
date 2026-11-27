@@ -1,5 +1,39 @@
 # Journal des changements
 
+## 1.12.0 (étage 1 de Babel : les comportements du bestiaire)
+
+- **Parties** (`parties:`) : l'os du modèle que le joueur vise prend le coup ; cordes de l'Os-violon (3 coups : plus
+  d'aura), branches de la Mèche-sourde (3 coups : une bougie de moins, animation `branche_coupee_*`), cuve de la
+  Moulière (× 1,5) ; conditions de butin notées (`trois_cordes_coupees`, `par_branche_coupee`).
+- **Coups reçus** : `faiblesse` (Feu-follet × 2,5 aux tirs, Phalène × 1,5 aux zones, Cierge × 1,5 au Feu et ramolli :
+  Défense ÷ 2 5 s), `figee-par` (Moulière figée par l'Eau ou la Glace), mèche du Cierge de dos (`point-faible.partie`,
+  `e1.meche_eteinte`), tête de la Porte-Fardeau × 2 après ses attaques (`ouverture`), coups trop hauts sur le Squelette
+  rampant (`hitbox-basse`), tirs déviés par la Danse-parade (`immunite-projectiles`).
+- **Comportements** : lueur d'âme (`lueur`), phalènes qui baissent les torches et lanternes (`eteint-lumiere`), goule qui
+  mange les corps (`manger`, `VoraceMobActionEvent` « manger »), Sauteur aveugle (`perception: mouvement`) et son sceau
+  recollé de dos (`sceau`, `e1.sceau_recolle`), Attentive (`regard` : intangible quand personne ne la regarde, aveugle
+  qui la fixe 4 s), Faucheuse (`vision`), Mèche qui vise la lumière (`cible: lumiere`), Feu-follet qui fuit vers un
+  cul-de-sac puis appelle (`appel`, condition `avant_appel`), Lame-orpheline qui tend sa poignée (`offrande`) et se rend
+  à 1 de Vie (`invincible`), ballot de la Porte-Fardeau (`leurre`, `e1.ballot_ramasse`), Glaneur qui ramasse les objets
+  perdus à la mort d'un joueur (`sac` : rendus s'il meurt, troc `e1.troc_glaneur`), Lanceur qui tourne lentement
+  (`rotation`), âme enragée qui explose en fin de vie (`fin-de-vie`) et en frappant (`sacrifice`).
+- **Passeur** : tête-lanterne (partie détachée qui tourne au-dessus de lui, 6 % de sa Vie : détruite, il frappe au hasard
+  et prend +20 % 6 s, elle revient 20 s plus tard), lanterne posée en phase 3 (le corps ne prend plus que 20 % ; la
+  lanterne fêlée l'achève), charge contre une paroi (`contre-paroi` : étourdi 3 s), garde centrée sur la lanterne.
+- **Armure veuve** : `formes` et `recomposition` (3 s entre deux formes ; 8 % de la forme suivante en dégâts cassent une
+  pièce : −25 % de Vie, −10 % de dégâts, condition `par_piece_cassee`).
+- **Attaques** : `colle`, `trajectoire: droite`, `sautable`, `cibles-min`, `apres-jeu`, `branches`, `si`,
+  `seulement-hors-regard`, `fragment-d-ame` (Fauchage : −10 % de Vie max 5 min, `VoraceMobAPI.fragmentsAme`),
+  `evenement-interrompu` (`e1.mouliere_interrompue`), `evenement-ratee` (`e1.goule_punie`).
+- **Entités de quête** (tête-lanterne, Faucheuse fantôme) : `invulnerable`, `regard` (cône, accroupi, lanterne en main),
+  `vu` (événement `e1.faucheuse_vu`, `e1.tete_lanterne_vu`, repousse vers le Fil), `ronde` (blocs/s), `duree-de-vie`.
+- **Rôles d'animation** `touche` et `mort` : joués par les réactions automatiques du modèle.
+- **API** : `VoraceMobEvenementEvent` (joueur, mob, clé) ; `infliger(entite, montant, source, type, nature)` ;
+  `visiblePour(entite, joueurs)` ; `fragmentsAme(joueur)`. Défense ÷ 2 dans `stat` quand le mob est ramolli.
+- Correction : un mob avec `fuite` mais sans `si-arrive` (Feu-follet) n'est plus mené comme le crâne qui court (il ne
+  disparaissait plus en arrivant au bout de sa fuite, il se bat).
+- Essai serveur : l'essaim baisse une torche puis la rallume, l'entité de quête est invulnérable et fait sa ronde.
+
 ## 1.11.0 (étage 1 de Babel : embuscades, invocations, soins d'allié, aura, neutres)
 
 - **Un seul butin par mob** (choix d'Antoine) : le butin par membre à 10 % de la 1.9.0 est retiré, il dupliquait le

@@ -28,12 +28,14 @@ import java.util.Map;
  * @param marche     volants : vitesse de marche au sol (blocs/s) quand il est posé ; 0 = il reste sur place
  * @param combat     bloc {@code combat:} (niveau, Vie, rang, stats) ; null = mob sans combat (Vie du jeu)
  * @param neutre     mob de combat qui n'attaque que si on le frappe (Glaneur, Lame-orpheline)
+ * @param quete      entité de quête sans combat : invulnérable, regard, vu, ronde ({@link Speciaux.Quete})
  */
 public record DefinitionMob(String id, String nom, String type, List<String> modeles, double tailleMin, double tailleMax,
                             double vie, double vitesse, double degats, Cerveau.Caractere caractere, String ia, double laisse,
                             String zone, Cerveau.Activite activite, double cohesion, double detection, List<String> nourriture,
                             boolean boit, boolean silencieux, Map<String, String> animations, List<String> ennui, double envol,
-                            String vol, double altMin, double altMax, double marche, Combat combat, boolean neutre) {
+                            String vol, double altMin, double altMax, double marche, Combat combat, boolean neutre,
+                            Speciaux.Quete quete) {
 
     public boolean decor() { return type.equals("decor"); }
     public boolean cerveau() { return ia.equals("vorace") && !decor() && vol == null; }
@@ -98,7 +100,8 @@ public record DefinitionMob(String id, String nom, String type, List<String> mod
             Math.max(2, s.getDouble("laisse", 24)), s.getString("zone"), act, Math.max(0, cohesion), Math.max(1, s.getDouble("detection", 10)),
             List.copyOf(nourriture), s.getBoolean("boit", true), s.getBoolean("silencieux", false), Map.copyOf(anims), List.copyOf(ennui),
             Math.max(0, s.getDouble("envol", 0)), volLu(id, s, problemes), alt(s, 0), alt(s, 1), Math.max(0, s.getDouble("marche", 0)),
-            Combat.lire(id, s.getConfigurationSection("combat"), problemes), s.getBoolean("neutre", false));
+            Combat.lire(id, s.getConfigurationSection("combat"), problemes), s.getBoolean("neutre", false),
+            Speciaux.Quete.lire(id, s, problemes));
     }
 
     private static String volLu(String id, ConfigurationSection s, List<String> problemes) {

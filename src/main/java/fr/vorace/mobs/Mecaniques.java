@@ -25,15 +25,16 @@ import java.util.Locale;
  *   famille: cire                                                   # famille (soins d'allié de la Moulière)
  *   eclair-a-la-mort: { rayon: 6, aveuglement: 20 }                 # sa mort aveugle les joueurs autour
  *   aura: { rayon: 10, degats: 0.2, purification: true }            # les mobs autour frappent plus fort
+ *   # et les comportements du bestiaire ({@link Speciaux.Mob}) : lueur, faiblesse, parties, sceau, regard, sac...
  * </pre>
  *
  * Sans Bukkit, sauf la lecture.
  */
 public record Mecaniques(Invocation aLaMort, Garde garde, PointFaible pointFaible, boolean jamaisMortel, int dureeDeVie,
                          Fuite fuite, Releve siArrive, Munitions munitions, Tertre tertre, Ronde ronde, String famille,
-                         Eclair eclairALaMort, Aura aura) {
+                         Eclair eclairALaMort, Aura aura, Speciaux.Mob sp) {
 
-    public static final Mecaniques AUCUNE = new Mecaniques(null, null, null, false, 0, null, null, null, null, null, null, null, null);
+    public static final Mecaniques AUCUNE = new Mecaniques(null, null, null, false, 0, null, null, null, null, null, null, null, null, Speciaux.Mob.AUCUN);
 
     /** À sa mort, un éclair aveugle les joueurs à {@code rayon} blocs pendant {@code aveuglement} tics (essaim de phalènes). */
     public record Eclair(double rayon, int aveuglement) {}
@@ -214,9 +215,10 @@ public record Mecaniques(Invocation aLaMort, Garde garde, PointFaible pointFaibl
         Aura au = null;
         ConfigurationSection as = s.getConfigurationSection("aura");
         if (as != null) au = new Aura(Math.max(1, as.getDouble("rayon", 10)), Math.max(0, as.getDouble("degats", 0.2)), as.getBoolean("purification", true));
+        Speciaux.Mob sp = Speciaux.Mob.lire(id, s, problemes);
         if (inv == null && g == null && pf == null && !jamais && duree == 0 && fu == null && rel == null && mu == null && te == null && ro == null
-            && fam == null && ec == null && au == null)
+            && fam == null && ec == null && au == null && sp.rien())
             return AUCUNE;
-        return new Mecaniques(inv, g, pf, jamais, duree, fu, rel, mu, te, ro, fam == null ? null : fam.toLowerCase(Locale.ROOT), ec, au);
+        return new Mecaniques(inv, g, pf, jamais, duree, fu, rel, mu, te, ro, fam == null ? null : fam.toLowerCase(Locale.ROOT), ec, au, sp);
     }
 }

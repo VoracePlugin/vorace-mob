@@ -68,6 +68,7 @@ public final class Mobs {
     private final IACombat ia;
     private final Butin butin;
     private final Comportements comportements;
+    private final Bestiaire bestiaire;
 
     /** Mobs suivis d'un point d'apparition (gardés dans donnees/apparitions.yml). */
     static final class EtatApparition {
@@ -93,6 +94,7 @@ public final class Mobs {
         ia = new IACombat(plugin, this);
         butin = new Butin(plugin);
         comportements = new Comportements(plugin, this);
+        bestiaire = new Bestiaire(plugin, this);
     }
 
     /** Monté par un joueur ou un autre mob (les affichages de la barre de vie, passagers eux aussi, ne comptent pas). */
@@ -107,6 +109,7 @@ public final class Mobs {
     IACombat ia() { return ia; }
     Butin butin() { return butin; }
     Comportements comportements() { return comportements; }
+    Bestiaire bestiaire() { return bestiaire; }
     Rangs rangs() { return rangs; }
     /** Tics écoulés depuis le démarrage des mobs. */
     long tics() { return tic; }
@@ -250,6 +253,7 @@ public final class Mobs {
         if (tache != null) tache.cancel();
         try { ia.vider(); } catch (Throwable ignore) { }
         try { combats.vider(); } catch (Throwable ignore) { }
+        try { bestiaire.vider(); } catch (Throwable ignore) { }
         for (Suivi s : suivis.values()) sauverBesoins(s);
         sauverRegistre();
     }
@@ -452,6 +456,10 @@ public final class Mobs {
                 if (inv != null) {
                     try { comportements.aLaMort(s, inv); } catch (Throwable ex) { erreur("a-la-mort " + s.d.id(), ex); }
                 }
+                Player tueur = le.getKiller();
+                UUID g = s.ia == null ? null : Butin.gagnant(s.ia.degats);
+                if (tueur == null && g != null) tueur = Bukkit.getPlayer(g);
+                try { bestiaire.mort(s, tueur); } catch (Throwable ex) { erreur("bestiaire " + s.d.id(), ex); }
                 Mecaniques.Eclair ec = s.d.combat().meca().eclairALaMort();
                 if (ec != null) {
                     try { comportements.eclair(s, ec); } catch (Throwable ex) { erreur("eclair " + s.d.id(), ex); }
@@ -556,6 +564,7 @@ public final class Mobs {
         Suivi nouveau = suivis.get(e.getUniqueId());
         if (nouveau != null && !d.decor()) {
             try { comportements.apparition(nouveau); } catch (Throwable ex) { erreur("apparition " + d.id(), ex); }
+            try { bestiaire.apparition(nouveau); } catch (Throwable ex) { erreur("bestiaire " + d.id(), ex); }
         }
         return e;
     }
@@ -894,8 +903,9 @@ public final class Mobs {
             try { comportements.tic(new ArrayList<>(suivis.values())); } catch (Throwable ex) { erreur("comportements", ex); }
             try { reveillerCaches(); } catch (Throwable ex) { erreur("caches", ex); }
         }
+        try { bestiaire.tic(); } catch (Throwable ex) { erreur("bestiaire", ex); }
         for (Suivi s : new ArrayList<>(suivis.values())) {
-            if (s.ia == null || (!s.ia.engage && !s.ia.rentre) || comportements.gere(s)) continue;
+            if (s.ia == null || (!s.ia.engage && !s.ia.rentre) || comportements.gere(s) || bestiaire.gere(s)) continue;
             try { ia.tic(s); } catch (Throwable ex) { erreur("combat " + s.d.id(), ex); }
         }
         for (Suivi s : suivis.values()) {
