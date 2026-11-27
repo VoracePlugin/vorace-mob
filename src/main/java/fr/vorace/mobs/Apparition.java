@@ -27,11 +27,19 @@ import java.util.Locale;
  * @param pauseJoueur  pas de vague tant qu'un joueur est à moins de ces blocs (0 : jamais)
  * @param pauseMax     secondes au plus sans vague, même en pause (0 : sans limite)
  * @param entraide     distance d'entraide des mobs de ce point (−1 : celle du mob)
+ * @param paroi        {@code apparition: paroi} : ils sortent d'une paroi (fissure lumineuse de {@link #FISSURE} tics), jamais
+ *                     à moins de {@link #DISTANCE_PAROI} blocs d'un joueur
+ * @param ronde        ronde de ses mobs au calme (ou null)
  */
 public record Apparition(String id, List<String> mobs, String monde, double x, double y, double z, double rayon, int nombre,
                          boolean troupeau, double laisse, double reapparition, String zone, int niveau, double cycle,
                          double chance, String groupe, double xpMult, Combat.Lot bonus, String pauseSalle, double pauseJoueur,
-                         double pauseMax, double entraide) {
+                         double pauseMax, double entraide, boolean paroi, Mecaniques.Ronde ronde) {
+
+    /** Durée de la fissure lumineuse d'une sortie de paroi (tics). */
+    public static final int FISSURE = 30;
+    /** Une sortie de paroi ne se fait jamais à moins de ces blocs d'un joueur. */
+    public static final double DISTANCE_PAROI = 8;
 
     /** En pause ? {@code salleOccupee}, {@code joueurProche} ; {@code depuis} : ms depuis la dernière vague (ou la première mort). */
     public boolean enPause(boolean salleOccupee, boolean joueurProche, long depuis) {
@@ -68,6 +76,8 @@ public record Apparition(String id, List<String> mobs, String monde, double x, d
      *   pause-si-joueur: 24        # facultatif : pas de vague tant qu'un joueur est à 24 blocs (rien n'apparaît sous ses yeux)
      *   pause-max: 1200            # facultatif : jamais plus de 1 200 s sans vague, même en pause
      *   entraide: 0                # facultatif : distance d'entraide des mobs de ce point (0 : on les prend un par un)
+     *   apparition: paroi          # facultatif : ils sortent d'une paroi proche (fissure lumineuse de 1,5 s)
+     *   ronde: { points: [[230, 41], [229, 60], [236, 73]], arret: 300 }   # facultatif : ronde au calme (aller-retour)
      * </pre>
      */
     public static Apparition lire(String id, ConfigurationSection s, List<String> problemes) {
@@ -84,7 +94,8 @@ public record Apparition(String id, List<String> mobs, String monde, double x, d
                 Math.max(0, s.getInt("niveau", 0)), Math.max(0, s.getDouble("cycle", 0)),
                 Math.max(0, Math.min(1, s.getDouble("chance", 1))), s.getString("groupe"), Math.max(0, s.getDouble("xp-multiplicateur", 1)),
                 bonus(id, s, problemes), s.getString("pause-si-salle"), Math.max(0, s.getDouble("pause-si-joueur", 0)),
-                Math.max(0, s.getDouble("pause-max", 0)), s.contains("entraide") ? Math.max(0, s.getDouble("entraide", 0)) : -1);
+                Math.max(0, s.getDouble("pause-max", 0)), s.contains("entraide") ? Math.max(0, s.getDouble("entraide", 0)) : -1,
+                "paroi".equalsIgnoreCase(s.getString("apparition", "")), Mecaniques.Ronde.lire("apparition " + id, s.getConfigurationSection("ronde"), problemes));
         } catch (RuntimeException e) {
             problemes.add("apparition " + id + " : centre mal écrit");
             return null;

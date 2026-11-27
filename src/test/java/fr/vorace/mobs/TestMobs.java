@@ -465,6 +465,64 @@ public final class TestMobs {
             && !chap.enPause(true, true, 1_200_000) && !simple.enPause(true, true, 0),
             "Chapelle : pas de vague pendant le combat du Passeur ni sous les yeux d'un joueur, 1 200 s au plus");
 
+        // 1.9.0 : butin spécial, butin par membre, second coup, munitions, crâne qui court, tertre, ronde, phases
+        YamlConfiguration y9 = YamlConfiguration.loadConfiguration(new java.io.StringReader(String.join("\n",
+            "mosaique: { type: husk, combat: { niveau: 1, vie: 330, a-la-mort: { invocation: e1_crane_qui_court, nombre: 1, depart: h_head, delai: 7 },",
+            "  competences: { attaque_double: { forme: cone, rayon: 2.2, angle: 60, signal: 15, actif: 1, recuperation: 12, second-coup: { tic: 28, forme: cone, angle: 120, rayon: 2.2, multiplicateur: 0.5 } } },",
+            "  butin-special: [ { objet: \"vorace:e1_poussiere_os\", chance: 0.5, nombre: [1, 2], chasseur: true }, { objet: \"vorace:e1_bouclier_fendu\", chance: 0.05, si: garde_brisee },",
+            "    { objet: \"vorace:e1_meche_tressee\", chance: 0.1, si: par_branche_coupee }, { objet: \"vorace:cristal_azur\", chance: 1, nombre: 20, premier-kill: true } ] } }",
+            "crane: { type: silverfish, combat: { niveau: 1, vie: 10, duree-de-vie: 160, fuite: { vers: tas_os, rayon: 8 }, si-arrive: { releve: e1_squelette_mosaique, vie: 0.5, delai: 60 } } }",
+            "meche: { type: husk, combat: { niveau: 3, vie: 480, munitions: { nombre: 3, recharge: depot_de_cire }, competences: {",
+            "  goutte: { forme: projectile, portee: [4, 16], munitions: 3 }, recharge: { forme: contact, portee: 0, signal: 160, apres-munitions: 3 } } } }",
+            "gardien: { type: husk, combat: { niveau: 4, vie: 1500, rang: elite, tertre: { regen: 0.01, assis: true } } }",
+            "passeur: { type: husk, combat: { niveau: 5, vie: 12500, rang: boss, phases: [ { seuil: 0.6, animations: { garde: idle_a_pied, marche-combat: marche_a_pied } },",
+            "  { seuil: 0.25, animations: { garde: idle_garde } } ] } }",
+            "faucheuse: { type: husk, combat: { niveau: 5, vie: 13900, ronde: { points: [[230, 41], [229, 60], [236, 73]], arret: 300 } } }")));
+        pb.clear();
+        Combat c9 = DefinitionMob.lire("mosaique", y9.getConfigurationSection("mosaique"), pb).combat();
+        Combat cr9 = DefinitionMob.lire("crane", y9.getConfigurationSection("crane"), pb).combat();
+        Combat me9 = DefinitionMob.lire("meche", y9.getConfigurationSection("meche"), pb).combat();
+        Combat ga9 = DefinitionMob.lire("gardien", y9.getConfigurationSection("gardien"), pb).combat();
+        Combat pa9 = DefinitionMob.lire("passeur", y9.getConfigurationSection("passeur"), pb).combat();
+        Combat fa9 = DefinitionMob.lire("faucheuse", y9.getConfigurationSection("faucheuse"), pb).combat();
+        verifier(pb.isEmpty(), "1.9.0 : fiches lues sans problème " + pb);
+        Competence ad = c9.competences().get(0);
+        verifier(ad.secondCoup() != null && ad.secondCoup().tic() == 28 && ad.secondCoup().largeur() == 120 && ad.secondCoup().multiplicateur() == 0.5
+            && ad.total() == 28, "second coup lu (tic 28, cône 120°, × 0,5) ; l'attaque dure jusqu'à lui");
+        verifier(c9.meca().aLaMort().depart().equals("h_head") && c9.meca().aLaMort().delai() == 7, "a-la-mort : depuis l'os h_head, 7 tics après");
+        verifier(c9.butinSpecial().size() == 4 && c9.butinSpecial().get(0).chasseur() && "garde_brisee".equals(c9.butinSpecial().get(1).si())
+            && c9.butinSpecial().get(3).premierKill() && c9.butinSpecial().get(3).lot().min() == 20, "butin-special lu (chasseur, si, premier-kill)");
+        Combat.LotSpecial garde9 = c9.butinSpecial().get(1), branche9 = c9.butinSpecial().get(2);
+        verifier(garde9.chance(0) == 0 && garde9.chance(1) == 0.05 && garde9.chance(3) == 0.05 && branche9.chance(0) == 0
+            && Math.abs(branche9.chance(3) - 0.3) < 1e-9 && branche9.chance(20) == 1 && c9.butinSpecial().get(0).chance(0) == 0.5,
+            "conditions : « si » seulement si notée ; « par_... » × le nombre de fois (1 au plus)");
+        verifier(cr9.meca().dureeDeVie() == 160 && cr9.meca().fuite().vers().equals("tas_os") && cr9.meca().fuite().blocs().contains("bone_block")
+            && cr9.meca().siArrive().mob().equals("e1_squelette_mosaique") && cr9.meca().siArrive().vie() == 0.5 && cr9.meca().siArrive().delai() == 60,
+            "crâne qui court : 8 s de vie, fuit vers un tas d'os (bloc d'os), relève la Mosaïque à 50 % au bout de 3 s");
+        Competence goutte = me9.competences().stream().filter(x -> x.id().equals("goutte")).findFirst().get();
+        Competence rech = me9.competences().stream().filter(x -> x.id().equals("recharge")).findFirst().get();
+        verifier(me9.meca().munitions().nombre() == 3 && me9.meca().munitions().blocs().contains("honeycomb_block") && goutte.munitions()
+            && !goutte.rechargeMunitions() && rech.rechargeMunitions() && !rech.munitions(), "Mèche-sourde : 3 munitions, recharge au dépôt de cire");
+        verifier(ga9.meca().tertre().assis() && ga9.meca().tertre().regen() == 0.01 && ga9.meca().tertre().attente() == 200, "Gardien : assis, 1 % par seconde après 10 s");
+        verifier("idle_a_pied".equals(IACombat.animDePhase(pa9, 1, "garde")) && "marche_a_pied".equals(IACombat.animDePhase(pa9, 2, "marche-combat"))
+            && "idle_garde".equals(IACombat.animDePhase(pa9, 2, "garde")) && IACombat.animDePhase(pa9, 0, "garde") == null,
+            "Passeur : repos et marche à pied en phase 2, garde de la lanterne en phase 3");
+        Mecaniques.Ronde ro = fa9.meca().ronde();
+        int[] n1 = ro.suivant(1, 1), n2 = ro.suivant(2, 1), n3 = ro.suivant(0, -1);
+        verifier(ro.points().size() == 3 && ro.arret() == 300 && n1[0] == 2 && n2[0] == 1 && n2[1] == -1 && n3[0] == 1 && n3[1] == 1
+            && ro.bout(0) && ro.bout(2) && !ro.bout(1) && ro.plusProche(236, 70) == 2, "ronde : aller-retour, arrêt aux deux bouts");
+        java.util.UUID ja = new java.util.UUID(0, 1), jb = new java.util.UUID(0, 2), jc = new java.util.UUID(0, 3);
+        java.util.Map<java.util.UUID, Double> dg = java.util.Map.of(ja, 900.0, jb, 95.0, jc, 5.0);
+        verifier(Butin.membres(Combat.Rang.NORMAL, dg, java.util.Map.of()).equals(List.of(ja))
+            && Butin.membres(Combat.Rang.ELITE, dg, java.util.Map.of()).size() == 1
+            && Butin.membres(Combat.Rang.ELITE, dg, java.util.Map.of(jc, 120.0)).containsAll(List.of(ja, jc))
+            && Butin.membres(Combat.Rang.BOSS, java.util.Map.of(ja, 500.0, jb, 500.0), java.util.Map.of()).size() == 2,
+            "butin de groupe : élites et boss, chaque membre à 10 % (dégâts + soins) ; monstre normal : le gagnant seul");
+        Apparition ap9 = Apparition.lire("faucheuse", YamlConfiguration.loadConfiguration(new java.io.StringReader(
+            "a: { mob: e1_faucheuse_errante, centre: [230.5, 41, 40.5], apparition: paroi, ronde: { points: [[230, 41], [229, 60]], arret: 300 } }")).getConfigurationSection("a"), pb);
+        verifier(ap9.paroi() && ap9.ronde() != null && ap9.ronde().points().size() == 2 && !simple.paroi() && simple.ronde() == null,
+            "points d'apparition : sortie de paroi et ronde lues");
+
         System.out.println(echecs == 0 ? "TOUS LES TESTS PASSENT" : echecs + " ECHEC(S)");
         System.exit(echecs == 0 ? 0 : 1);
     }

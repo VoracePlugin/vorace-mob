@@ -110,33 +110,135 @@ final class Butin {
         return m == null || !m.isItem() ? null : new ItemStack(m, n);
     }
 
-    /** Mort d'un mob de combat : événement, puis objets réservés au gagnant et XP du jeu. */
+    /** Part des contributions au-dessus de laquelle un membre tire sa table (élites, élites ++ et boss). */
+    static final double PART_MEMBRE = 0.10;
+
+    /**
+     * Membres qui tirent leur table : pour un élite, un élite ++ ou un boss, chaque joueur qui a fait au moins 10 % des
+     * contributions (dégâts + soins et protections) ; sinon le seul gagnant (50,01 %). Le gagnant vient en premier.
+     */
+    static List<UUID> membres(Combat.Rang rang, Map<UUID, Double> degats, Map<UUID, Double> soutiens) {
+        List<UUID> l = new ArrayList<>();
+        UUID g = gagnant(degats);
+        if (g == null) return l;
+        l.add(g);
+        if (rang == Combat.Rang.NORMAL) return l;
+        Map<UUID, Double> total = new HashMap<>(degats);
+        soutiens.forEach((k, v) -> total.merge(k, Math.max(0, v), Double::sum));
+        double somme = 0;
+        for (double v : total.values()) somme += Math.max(0, v);
+        if (somme <= 0) return l;
+        for (Map.Entry<UUID, Double> x : total.entrySet()) {
+            if (!x.getKey().equals(g) && x.getValue() / somme >= PART_MEMBRE - 1e-9) l.add(x.getKey());
+        }
+        return l;
+    }
+
+    /**
+     * Tire les lignes de {@code butin-special} pour un joueur : conditions notées pendant le combat ({@code si:}), premier
+     * kill ({@code premierKill} : le joueur n'a jamais tué ce mob). Les pièces du Chasseur vont dans {@code pieces}.
+     */
+    List<ItemStack> tirerSpecial(Combat c, Map<String, Integer> conditions, boolean premierKill, List<ItemStack> pieces) {
+        List<ItemStack> l = new ArrayList<>();
+        for (Combat.LotSpecial ls : c.butinSpecial()) {
+            if (ls.premierKill() && !premierKill) continue;
+            double ch = ls.chance(ls.si() == null ? 1 : conditions.getOrDefault(ls.si(), 0));
+            if (ch <= 0 || hasard.nextDouble() >= ch) continue;
+            Combat.Lot lot = ls.lot();
+            int n = lot.min() + (lot.max() > lot.min() ? hasard.nextInt(lot.max() - lot.min() + 1) : 0);
+            if (n <= 0) continue;
+            (ls.chasseur() ? pieces : l).addAll(objets(lot.objet(), n));
+        }
+        return l;
+    }
+
+    /** Joueurs qui ont déjà tué chaque mob (premier kill), lus et sauvés dans donnees/premiers-kills.yml. */
+    private final Map<String, java.util.Set<UUID>> premiers = new HashMap<>();
+    private boolean premiersLus;
+
+    private java.nio.file.Path fichierPremiers() { return plugin.getDataFolder().toPath().resolve("donnees").resolve("premiers-kills.yml"); }
+
+    /** Vrai (et noté) si c'est la première fois que ce joueur tue ce mob. */
+    boolean premierKill(String mob, UUID joueur) {
+        if (!premiersLus) {
+            premiersLus = true;
+            java.io.File f = fichierPremiers().toFile();
+            if (f.isFile()) {
+                org.bukkit.configuration.file.YamlConfiguration y = org.bukkit.configuration.file.YamlConfiguration.loadConfiguration(f);
+                for (String k : y.getKeys(false)) {
+                    java.util.Set<UUID> set = new java.util.HashSet<>();
+                    for (String u : y.getStringList(k)) { try { set.add(UUID.fromString(u)); } catch (IllegalArgumentException ignore) { } }
+                    premiers.put(k, set);
+                }
+            }
+        }
+        if (!premiers.computeIfAbsent(mob, k -> new java.util.HashSet<>()).add(joueur)) return false;
+        try {
+            org.bukkit.configuration.file.YamlConfiguration y = new org.bukkit.configuration.file.YamlConfiguration();
+            premiers.forEach((k, v) -> y.set(k, v.stream().map(UUID::toString).sorted().toList()));
+            java.nio.file.Files.createDirectories(fichierPremiers().getParent());
+            y.save(fichierPremiers().toFile());
+        } catch (java.io.IOException e) {
+            plugin.getLogger().warning("premiers-kills.yml non sauvé : " + e.getMessage());
+        }
+        return true;
+    }
+
+    /**
+     * Mort d'un mob de combat : chaque membre qui y a droit tire sa table (le gagnant seul pour un monstre normal), puis
+     * l'événement, puis les objets réservés à chacun et l'XP du jeu au gagnant. Un mob relevé (sans butin) ne donne rien.
+     */
     void mort(Mobs.Suivi s, Location ou) {
         Combat c = s.d.combat();
         Map<UUID, Double> degats = s.ia == null ? Map.of() : new HashMap<>(s.ia.degats);
+        Map<UUID, Double> soutiens = s.ia == null ? Map.of() : new HashMap<>(s.ia.soutiens);
+        Map<String, Integer> conditions = s.ia == null ? Map.of() : new HashMap<>(s.ia.conditions);
         UUID g = gagnant(degats);
         Player gagnant = g == null ? null : Bukkit.getPlayer(g);
-        List<ItemStack> objets = gagnant == null ? new ArrayList<>() : tirer(c);
-        // point d'apparition : XP multipliée et objet en plus (régions de l'étage 1)
         Apparition a = plugin.mobs().apparition(s.apparition);
-        if (gagnant != null && a != null && a.bonus() != null && hasard.nextDouble() < a.bonus().chance()) objets.addAll(objets(a.bonus().objet(), a.bonus().min()));
-        double xp = c.xpAuNiveau(s.niveau) * (a == null ? 1 : a.xpMult());
-        VoraceMobMortEvent ev = new VoraceMobMortEvent(s.e, s.d.id(), c.rang().nom(), s.niveau, Map.copyOf(degats), gagnant, objets, xp);
+        List<ItemStack> objets = new ArrayList<>();
+        Map<UUID, List<ItemStack>> autres = new HashMap<>(), pieces = new HashMap<>();
+        if (!s.sansButin) {
+            for (UUID u : membres(c.rang(), degats, soutiens)) {
+                Player p = Bukkit.getPlayer(u);
+                if (p == null || !p.isOnline()) continue;
+                List<ItemStack> l = tirer(c), pr = new ArrayList<>();
+                // point d'apparition : un objet en plus (régions de l'étage 1)
+                if (a != null && a.bonus() != null && hasard.nextDouble() < a.bonus().chance()) l.addAll(objets(a.bonus().objet(), a.bonus().min()));
+                if (!c.butinSpecial().isEmpty()) {
+                    boolean premier = c.butinSpecial().stream().anyMatch(Combat.LotSpecial::premierKill) ? premierKill(s.d.id(), u) : false;
+                    l.addAll(tirerSpecial(c, conditions, premier, pr));
+                }
+                if (!pr.isEmpty()) pieces.put(u, pr);
+                if (u.equals(g)) objets.addAll(l);
+                else autres.put(u, l);
+            }
+        }
+        double xp = s.sansButin ? 0 : c.xpAuNiveau(s.niveau) * (a == null ? 1 : a.xpMult());
+        VoraceMobMortEvent ev = new VoraceMobMortEvent(s.e, s.d.id(), c.rang().nom(), s.niveau, Map.copyOf(degats), gagnant, objets, xp,
+            autres, pieces, s.sansButin);
         Bukkit.getPluginManager().callEvent(ev);
+        for (Map.Entry<UUID, List<ItemStack>> x : ev.getButinDesMembres().entrySet()) lacher(ou, x.getKey(), x.getValue());
         if (gagnant == null) return;
-        for (ItemStack o : ev.getObjets()) {
+        lacher(ou, gagnant.getUniqueId(), ev.getObjets());
+        if (ev.isXpDuJeu() && ev.getXp() > 0) gagnant.giveExp((int) Math.round(ev.getXp()));
+    }
+
+    private static void lacher(Location ou, UUID pour, List<ItemStack> objets) {
+        if (objets == null) return;
+        for (ItemStack o : objets) {
             if (o == null || o.getType().isAir()) continue;
             Item i = ou.getWorld().dropItemNaturally(ou, o);
-            i.setOwner(gagnant.getUniqueId());
+            i.setOwner(pour);
             i.setCanMobPickup(false);
         }
-        if (ev.isXpDuJeu() && ev.getXp() > 0) gagnant.giveExp((int) Math.round(ev.getXp()));
     }
 
     /** Pour vérifier une table : « /vmob butin <mob> ». */
     List<String> problemes(Combat c) {
         List<String> l = new ArrayList<>();
         for (Combat.Lot lot : c.butin()) if (objet(lot.objet(), 1) == null) l.add(lot.objet());
+        for (Combat.LotSpecial ls : c.butinSpecial()) if (objet(ls.lot().objet(), 1) == null) l.add(ls.lot().objet());
         return l;
     }
 }

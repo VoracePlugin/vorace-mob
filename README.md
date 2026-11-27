@@ -69,11 +69,25 @@ mouton:
   {1: 0.4, 2: 0.7}` : Puissance de ses coups × 0,4 contre un joueur seul, × 0,7 contre deux, × 1 à partir de trois.
   Au retour au calme, il revient à un joueur. Un plugin de donjon peut imposer le nombre (joueurs de l'arène) avec
   `VoraceMobAPI.imposerJoueurs(entite, n)`. `/vmob info` affiche `joueurs=`.
-- **Mécaniques** (`combat:`) : `a-la-mort` (des mobs naissent à sa place), `garde` (garde de face qui se brise après
-  quelques coups), `point-faible` (dos : dégâts multipliés, figé), `jamais-mortel` (pantins d'entraînement).
+- **Mécaniques** (`combat:`) : `a-la-mort` (des mobs naissent à sa place, depuis un os du modèle et après un délai),
+  `garde` (garde de face qui se brise après quelques coups), `point-faible` (dos : dégâts multipliés, figé),
+  `jamais-mortel` (pantins d'entraînement), `duree-de-vie`, `fuite` + `si-arrive` (le crâne qui court rejoint un tas
+  d'os et relève son squelette, sans butin), `munitions` (tirs comptés, recharge au dépôt le plus proche), `tertre`
+  (assis au calme, se lève à l'engagement, regagne sa Vie peu à peu), `ronde`.
+- **Attaques, en plus** : `second-coup` (un deuxième coup dans la même attaque), `munitions` (l'attaque use une
+  munition), `apres-munitions` (la recharge).
+- **Phases** : `animations: {garde: idle_a_pied, marche-combat: marche_a_pied}` change le repos et la marche du mob à
+  partir de cette phase.
 - **Points d'apparition, en plus** : `chance` (monstre rare), `groupe` (même vague pour plusieurs points),
   `xp-multiplicateur`, `butin-bonus`, `pause-si-salle` (salle de boss de Matsuri Donjon occupée), `pause-si-joueur`,
-  `pause-max`, `entraide`.
+  `pause-max`, `entraide`, `apparition: paroi` (sortie d'une paroi, fissure lumineuse de 1,5 s, jamais à moins de 8
+  blocs d'un joueur), `ronde` (aller-retour au calme, arrêt aux deux bouts).
+- **Butin spécial** (`combat.butin-special`) : `chasseur: true` (pièce prélevable, rendue au plugin des métiers par
+  l'événement de mort au lieu de tomber), `si: garde_brisee` (seulement si la condition a été notée pendant le combat ;
+  `si: par_branche_coupee` : chance × le nombre de fois), `premier-kill: true` (une fois par joueur et par mob, gardé
+  dans `donnees/premiers-kills.yml`).
+- **Butin de groupe** : élites, élites ++ et boss : chaque membre qui a fait au moins 10 % des dégâts (ou des soins et
+  protections, `VoraceMobAPI.contribuer`) tire sa table, réservée à lui. Monstres normaux : le gagnant (50,01 %) seul.
 - **Butin** (`combat.butin`) : `objet: minecraft:bone`, `vorace:<objet>` (objet de vorace-core) ou `item:<modèle>`
   (arme, armure, munition de [vorace-item](https://github.com/VoracePlugin/vorace-item), à son rang de base et à une
   place tirée au hasard dans sa fourchette de stats ; ignoré sans vorace-item).
@@ -87,7 +101,7 @@ mouton:
   chaque mob son action, ses besoins, sa distance à la maison et la distance parcourue depuis son apparition (depuis la console,
   le nom d'un joueur relève les mobs autour de lui).
 - API : `fr.vorace.mobs.VoraceMobAPI` (`invoquerMob`, `mobVorace`, `actionMob`, `effrayerMob` ; combat : `stat`, `vie`, `infliger`, `coupEnCours`,
-  `joueursDuCombat`, `imposerJoueurs`...) ; événement
+  `joueursDuCombat`, `imposerJoueurs`, `noterCondition`, `contribuer`, `munitions`, `retirerMunitions`, `sansButin`...) ; événement
   `fr.vorace.mobs.VoraceMobActionEvent` à chaque changement d'action.
 
 ## Installation

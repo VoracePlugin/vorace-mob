@@ -241,6 +241,60 @@ public final class VoraceMobAPI {
         return s != null && s.ia != null && s.ia.gardeBrisee;
     }
 
+    /**
+     * Note une condition du butin {@code si:} pendant ce combat : {@code meche_eteinte}, {@code avant_appel},
+     * {@code trois_cordes_coupees}... Une condition {@code par_...} ({@code par_branche_coupee}, {@code par_piece_cassee})
+     * se compte : chaque note ajoute {@code fois} et la chance de la ligne est multipliée d'autant (1 au plus).
+     * {@code garde_brisee} est notée par vorace-mob. Faux si ce n'est pas un mob de combat.
+     */
+    public static boolean noterCondition(Entity e, String condition, int fois) {
+        Mobs.Suivi s = combattant(e);
+        if (s == null || s.ia == null) return false;
+        plugin.mobs().ia().noter(s, condition, fois);
+        return true;
+    }
+
+    /** Comme {@link #noterCondition(Entity, String, int)}, une fois. */
+    public static boolean noterCondition(Entity e, String condition) { return noterCondition(e, condition, 1); }
+
+    /** Nombre de fois qu'une condition du butin a été notée dans ce combat (0 sinon). */
+    public static int condition(Entity e, String condition) {
+        Mobs.Suivi s = combattant(e);
+        return s == null || s.ia == null || condition == null ? 0 : s.ia.conditions.getOrDefault(condition.toLowerCase(java.util.Locale.ROOT).trim(), 0);
+    }
+
+    /**
+     * Soins ou protection qu'un joueur apporte au combat contre ce mob (un soin sur un allié, un bouclier, des dégâts
+     * encaissés à la place d'un autre) : ils comptent comme des dégâts pour la part du butin des élites, élites ++ et boss
+     * (10 % des contributions au moins). Faux si ce n'est pas un mob de combat engagé.
+     */
+    public static boolean contribuer(Entity e, Player joueur, double montant) {
+        Mobs.Suivi s = combattant(e);
+        if (s == null || s.ia == null || !s.ia.engage) return false;
+        plugin.mobs().ia().contribuer(s, joueur, montant);
+        return true;
+    }
+
+    /** Munitions restantes de ce mob ({@code combat.munitions}) ; −1 s'il n'en a pas ou n'est pas en combat. */
+    public static int munitions(Entity e) {
+        Mobs.Suivi s = combattant(e);
+        return s == null || s.ia == null ? -1 : s.ia.munitions;
+    }
+
+    /** Lui retire des munitions (une branche coupée : un tir de moins). Faux s'il n'en a pas. */
+    public static boolean retirerMunitions(Entity e, int n) {
+        Mobs.Suivi s = combattant(e);
+        if (s == null || s.ia == null || s.ia.munitions < 0) return false;
+        s.ia.munitions = Math.max(0, s.ia.munitions - Math.max(0, n));
+        return true;
+    }
+
+    /** Vrai pour un mob relevé (tas d'os) : il ne donnera ni butin ni XP. */
+    public static boolean sansButin(Entity e) {
+        Mobs.Suivi s = combattant(e);
+        return s != null && s.sansButin;
+    }
+
     /** Le coup que ce mob porte en ce moment (pendant l'événement de dégâts de son coup), ou null. */
     public static CoupMob coupEnCours(Entity e) {
         Mobs.Suivi s = combattant(e);

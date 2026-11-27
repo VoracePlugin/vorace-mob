@@ -83,6 +83,18 @@ final class IACombat {
         boolean gardeBrisee;
         /** Nombre de joueurs imposé par un autre plugin (arène d'un boss), 0 : compté par vorace-mob. */
         int joueursImposes;
+        /** Conditions notées pendant le combat (butin {@code si:}) : nom → nombre de fois ({@code garde_brisee}...). */
+        final Map<String, Integer> conditions = new HashMap<>();
+        /** Soins et protections apportés par chaque joueur pendant ce combat ({@link VoraceMobAPI#contribuer}). */
+        final Map<UUID, Double> soutiens = new HashMap<>();
+        /** Munitions restantes ({@code combat.munitions}) ; −1 : pas encore comptées. Second coup de l'attaque fait. */
+        int munitions = -1;
+        boolean secondFait;
+        /** Dépôt où il va recharger (null : sur place ou pas encore cherché) ; dépôt cherché. */
+        Location depot;
+        boolean depotCherche;
+        /** Tic du retour au calme (tertre : regain après une attente). */
+        long calmeDepuis;
 
         /** Joueurs comptés pour la Vie et les dégâts (1 au moins). */
         int joueurs() { return Math.max(1, Math.max(joueursImposes, verrouilles.size())); }
@@ -225,8 +237,14 @@ final class IACombat {
         s.dernierCombat = System.currentTimeMillis();
         Modeles.Instance m = modele(s);
         String alerte = anim(s, m, "alerte");
-        if (alerte != null) { m.jouer(alerte, false); e.libreA = tic() + 14; }
+        Mecaniques.Tertre tertre = s.d.combat().meca().tertre();
+        String lever = tertre != null && tertre.assis() ? anim(s, m, "se-lever") : null;
+        if (m != null && lever == null && m.animation() != null && m.animation().equals(s.d.animation("assis"))) m.arreterAnimation();
+        if (lever != null) { m.jouer(lever, false); e.libreA = tic() + Math.max(1, tertre.lever()); e.immobile = Math.max(e.immobile, e.libreA); }
+        else if (alerte != null) { m.jouer(alerte, false); e.libreA = tic() + 14; }
         else e.libreA = tic() + 8;
+        Mecaniques.Munitions mu = s.d.combat().meca().munitions();
+        e.munitions = mu == null ? -1 : mu.nombre();
         if (s.e instanceof Mob mob) { mob.getPathfinder().stopPathfinding(); regarder(mob, p.getLocation()); }
         verrouiller(s, p);
         Apparition app = mobs.apparition(s.apparition);
@@ -278,6 +296,9 @@ final class IACombat {
         e.vitessePhase = 1; e.bonus = 1; e.enrage = false;
         e.verrouilles.clear(); e.joueursImposes = 0;
         e.coupsGardes = 0; e.gardeBriseeJusqua = 0; e.gardeBrisee = false;
+        e.conditions.clear(); e.soutiens.clear();
+        e.munitions = -1; e.depot = null; e.depotCherche = false; e.secondFait = false;
+        e.calmeDepuis = tic();
         mobs.combats().ajusterGroupe(s);   // retour à 1 joueur
         cacherBarre(s);
         retirerMarques(e);
@@ -285,9 +306,22 @@ final class IACombat {
         e.coups.clear();
         for (UUID u : e.invocations) { Entity x = Bukkit.getEntity(u); if (x != null && x.isValid()) x.remove(); }
         e.invocations.clear();
-        mobs.combats().soigner(s, s.vieMax);
+        // tertre (Gardien) : il ne récupère pas tout en rentrant, seulement peu à peu au calme (Comportements)
+        if (s.d.combat().meca().tertre() == null) mobs.combats().soigner(s, s.vieMax);
         e.prochainChemin = 0;
         e.debut = tic();
+    }
+
+    /** Note une condition du butin ({@code garde_brisee}, {@code par_branche_coupee}...) : {@code fois} de plus. */
+    void noter(Mobs.Suivi s, String condition, int fois) {
+        if (s.ia == null || condition == null || fois <= 0) return;
+        s.ia.conditions.merge(condition.toLowerCase(java.util.Locale.ROOT).trim(), fois, Integer::sum);
+    }
+
+    /** Soins ou protection apportés par un joueur dans ce combat (part du butin des élites et des boss). */
+    void contribuer(Mobs.Suivi s, Player p, double montant) {
+        if (s.ia == null || p == null || montant <= 0 || !s.ia.engage) return;
+        s.ia.soutiens.merge(p.getUniqueId(), montant, Double::sum);
     }
 
     /** Toutes les 10 tics, hors combat : le premier joueur vu à sa distance d'aggro devient sa cible. */
@@ -387,6 +421,7 @@ final class IACombat {
         if (g.briseApres() > 0 && s.ia.coupsGardes >= g.briseApres()) {
             s.ia.coupsGardes = 0;
             s.ia.gardeBrisee = true;
+            noter(s, "garde_brisee", 1);
             s.ia.gardeBriseeJusqua = tic() + g.ouverture();
             s.e.getWorld().playSound(ml, Sound.ITEM_SHIELD_BREAK, 1f, 1f);
             Modeles.Instance mi = modele(s);
@@ -520,6 +555,9 @@ final class IACombat {
             if (t >= e.immobile && cible != null) bouger(s, mob, m, cible, t);
             return;
         }
+
+        // plus de munitions : il marche à son dépôt (la recharge part une fois arrivé)
+        if (e.munitions == 0 && t >= e.immobile && t >= e.inactif && allerAuDepot(s, mob, m, t)) return;
 
         // nouvelle attaque ?
         if (t >= e.inactif) {
@@ -687,9 +725,31 @@ final class IACombat {
     /** Nom de l'animation d'un rôle de combat (garde, recul...) si le modèle l'a, sinon null. */
     private String anim(Mobs.Suivi s, Modeles.Instance m, String role) {
         if (m == null) return null;
-        String n = s.d.animation(role);
+        String n = s.ia == null ? null : animDePhase(s.d.combat(), s.ia.phase, role);
+        if (n != null && m.modele().animations().containsKey(n)) return n;
+        n = s.d.animation(role);
         if (n == null) n = ANIMS.get(role);
         return n != null && m.modele().animations().containsKey(n) ? n : null;
+    }
+
+    /** Rôles joués en boucle : leurs animations (du mob ou de ses phases) se remplacent l'une l'autre. */
+    static final List<String> ROLES_BOUCLE = List.of("garde", "marche", "marche-combat", "course", "recul", "droite", "gauche",
+        "fuite", "assis");
+
+    /** Vrai si {@code anim} est une boucle de ce mob : un rôle de {@link #ROLES_BOUCLE} dans ses animations ou ses phases. */
+    static boolean boucleDuMob(Mobs.Suivi s, String anim) {
+        for (String r : ROLES_BOUCLE) if (anim.equals(s.d.animation(r))) return true;
+        if (s.d.combattant()) for (Combat.Phase ph : s.d.combat().phases()) if (ph.animations().containsValue(anim)) return true;
+        return false;
+    }
+
+    /** Rôle remplacé par la phase en cours (ou une phase d'avant) : {@code phases[k].animations} ; null sinon. */
+    static String animDePhase(Combat cb, int phase, String role) {
+        for (int k = Math.min(phase, cb.phases().size()) - 1; k >= 0; k--) {
+            String n = cb.phases().get(k).animations().get(role);
+            if (n != null) return n;
+        }
+        return null;
     }
 
     /** Animation de déplacement en boucle, par-dessus (un coup reçu la coupe) ; rien si une autre animation joue. */
@@ -697,9 +757,11 @@ final class IACombat {
         if (m == null) return;
         String voulu = role == null ? null : anim(s, m, role);
         String cur = m.animation();
-        if (cur != null && !boucles.contains(cur)) return;     // attaque, coup reçu, réaction : on la laisse finir
+        // attaque, coup reçu, réaction : on la laisse finir (une boucle propre au mob ou à sa phase, posée ici, se remplace)
+        boolean boucle = cur != null && (boucles.contains(cur) || cur.equals(s.ia.anim) || boucleDuMob(s, cur));
+        if (cur != null && !boucle) return;
         if (voulu == null) {
-            if (cur != null && ANIMS.containsValue(cur)) m.arreterAnimation();
+            if (ANIMS.containsValue(cur) || cur != null && cur.equals(s.ia.anim)) m.arreterAnimation();
             s.ia.anim = null;
             return;
         }
@@ -724,8 +786,15 @@ final class IACombat {
         long[] ry = enGroupe(cb, cible) ? rythme.get(cible.getUniqueId()) : null;
         boolean attendre = ry != null && t < ry[0], sansLourde = ry != null && t < ry[1];
         int recus = coupsRecus(e.coups, t, 60);
+        // plus de munitions : la recharge passe avant tout, une fois arrivé au dépôt (ou sur place sans dépôt)
+        if (e.munitions == 0) {
+            for (Competence a : cb.competences()) {
+                if (a.rechargeMunitions() && t >= e.prete.getOrDefault(a.id(), 0L)) return e.depot == null || auDepot(mob, e.depot) ? a : null;
+            }
+        }
         for (Competence a : attendre ? List.<Competence>of() : cb.competences()) {
             if (t < e.prete.getOrDefault(a.id(), 0L) || e.phase < a.phase() || ratio > a.vieMax()) continue;
+            if (a.rechargeMunitions() || (a.munitions() && e.munitions == 0)) continue;
             if (recus < a.presse() || (sansLourde && a.lourde())) continue;
             boolean ok = switch (a.forme()) {
                 case CERCLE -> d <= a.porteeMax() + 0.3;
@@ -781,6 +850,8 @@ final class IACombat {
         e.enCours = c;
         e.t0 = t;
         e.frappe = false;
+        e.secondFait = false;
+        if (c.munitions() && e.munitions > 0) e.munitions--;
         Player vise = cible;
         if (c.fixation() != null) {
             Player f = fixation(s, mob, c.fixation());
@@ -911,12 +982,79 @@ final class IACombat {
         if (c.effets().pluie() == null && dt < c.signal() + c.actif() && (c.forme() == Competence.Forme.ZONE || c.forme() == Competence.Forme.CERCLE)) {
             for (Location z : e.zones) effetZone(z, c);
         }
+        if (c.secondCoup() != null && !e.secondFait && dt >= c.secondCoup().tic()) {
+            e.secondFait = true;
+            secondCoup(s, mob, c);
+        }
         if (dt >= c.total()) {
             e.prete.put(c.id(), e.t0 + Math.max(c.recharge(), c.total()));
+            if (c.rechargeMunitions() && s.d.combat().meca().munitions() != null) {
+                // recharge finie : toutes ses munitions, et il cherchera un autre dépôt la prochaine fois
+                e.munitions = s.d.combat().meca().munitions().nombre();
+                e.depot = null;
+                e.depotCherche = false;
+            }
             e.enCours = null;
             e.marques.clear();
             e.libreA = tic() + hasard.nextInt(5);
         }
+    }
+
+    /**
+     * Deuxième coup d'une attaque ({@code second-coup}) : sa forme part du mob, dans la direction de l'attaque ; dégâts ×
+     * son multiplicateur (au lieu de celui de l'attaque).
+     */
+    private void secondCoup(Mobs.Suivi s, Mob mob, Competence c) {
+        Competence.SecondCoup sc = c.secondCoup();
+        double part = c.multiplicateur() > 0 ? sc.multiplicateur() / c.multiplicateur() : sc.multiplicateur();
+        Location l = mob.getLocation();
+        World w = l.getWorld();
+        Vector dir = s.ia.direction == null ? l.getDirection().setY(0).normalize() : s.ia.direction;
+        double cos = Math.cos(Math.toRadians(sc.largeur() / 2));
+        for (Player p : w.getPlayers()) {
+            if (!cibleValide(p, mob) || Math.abs(p.getLocation().getY() - l.getY()) >= 2.5) continue;
+            Vector v = p.getLocation().toVector().subtract(l.toVector()).setY(0);
+            double d = v.length();
+            boolean touche = switch (sc.forme()) {
+                case CERCLE -> d <= sc.rayon() + 0.3;
+                case LIGNE -> {
+                    double avant = v.dot(dir), cote = Math.abs(v.getX() * -dir.getZ() + v.getZ() * dir.getX());
+                    yield avant >= -0.3 && avant <= sc.rayon() && cote <= sc.largeur() / 2 + 0.3;
+                }
+                case CONTACT -> d <= sc.rayon() + 0.7 && (d < 0.8 || v.clone().normalize().dot(dir) > 0.45);
+                default -> d <= sc.rayon() && (d < 0.8 || v.clone().normalize().dot(dir) >= cos);
+            };
+            if (touche) toucher(s, mob, c, p, part);
+        }
+        w.playSound(l, Sound.ENTITY_PLAYER_ATTACK_SWEEP, 0.8f, 0.7f);
+    }
+
+    /** Vrai s'il est arrivé à son dépôt de recharge. */
+    private static boolean auDepot(Mob mob, Location depot) {
+        return depot.getWorld().equals(mob.getWorld()) && Geometrie.distance(mob.getLocation().getX(), mob.getLocation().getZ(),
+            depot.getX(), depot.getZ()) <= 1.8 && Math.abs(mob.getLocation().getY() - depot.getY()) < 2.5;
+    }
+
+    /**
+     * Plus de munitions : il cherche (une fois) son dépôt, le point « recharge » ou le bloc le plus proche à {@code rayon}
+     * blocs, et y marche ; vrai tant qu'il marche. Sans dépôt, il recharge sur place.
+     */
+    private boolean allerAuDepot(Mobs.Suivi s, Mob mob, Modeles.Instance m, long t) {
+        Etat e = s.ia;
+        Mecaniques.Munitions mu = s.d.combat().meca().munitions();
+        if (mu == null) return false;
+        if (!e.depotCherche) {
+            e.depotCherche = true;
+            e.depot = mobs.endroitProche(mob.getLocation(), mu.recharge(), mu.rayon(), mu.blocs());
+        }
+        if (e.depot == null || auDepot(mob, e.depot)) return false;
+        if (t >= e.prochainChemin || !mob.getPathfinder().hasPath()) {
+            if (!mob.getPathfinder().moveTo(e.depot, 1.1 * s.d.combat().ia().vitesse() * e.vitessePhase)) { e.depot = null; return false; }
+            e.prochainChemin = t + 10;
+        }
+        e.mode = "depot";
+        jouerBoucle(s, m, "marche-combat");
+        return true;
     }
 
     /** Après son coup, le mob bondit (en arrière si {@code bond} est négatif) ; il cherche un côté libre si un mur le gêne. */
@@ -1485,6 +1623,9 @@ final class IACombat {
         if (c != null) b.append(" <gray>· cible <white>").append(c.getName());
         b.append(" <gray>· mode ").append(s.ia.mode);
         if (s.ia.enCours != null) b.append(" · attaque ").append(s.ia.enCours.nom());
+        if (s.ia.munitions >= 0) b.append(" · munitions ").append(s.ia.munitions);
+        if (!s.ia.conditions.isEmpty()) b.append(" · conditions ").append(s.ia.conditions);
+        if (s.sansButin) b.append(" · relevé (sans butin)");
         for (Map.Entry<UUID, Double> x : s.ia.menace.entrySet()) {
             Player p = Bukkit.getPlayer(x.getKey());
             b.append("\n<gray>  ").append(p == null ? x.getKey() : p.getName()).append(" : <white>").append(Math.round(x.getValue()))

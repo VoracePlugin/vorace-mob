@@ -49,7 +49,7 @@ import java.util.stream.Stream;
 public final class Mobs {
 
     private final VoraceMob plugin;
-    private final NamespacedKey cleMob, cleMaison, cleTroupeau, cleApparition, cleBesoins;
+    private final NamespacedKey cleMob, cleMaison, cleTroupeau, cleApparition, cleBesoins, cleSansButin;
     private Map<String, DefinitionMob> definitions = Map.of();
     private Map<String, Zone> zones = Map.of();
     private Map<String, Apparition> apparitions = Map.of();
@@ -66,6 +66,7 @@ public final class Mobs {
     private final Combats combats;
     private final IACombat ia;
     private final Butin butin;
+    private final Comportements comportements;
 
     /** Mobs suivis d'un point d'apparition (gardés dans donnees/apparitions.yml). */
     static final class EtatApparition {
@@ -84,9 +85,11 @@ public final class Mobs {
         cleTroupeau = NamespacedKey.fromString("vorace:mob_troupeau");
         cleApparition = NamespacedKey.fromString("vorace:mob_apparition");
         cleBesoins = NamespacedKey.fromString("vorace:mob_besoins");
+        cleSansButin = NamespacedKey.fromString("vorace:mob_sans_butin");
         combats = new Combats(plugin, this);
         ia = new IACombat(plugin, this);
         butin = new Butin(plugin);
+        comportements = new Comportements(plugin, this);
     }
 
     /** Monté par un joueur ou un autre mob (les affichages de la barre de vie, passagers eux aussi, ne comptent pas). */
@@ -100,6 +103,7 @@ public final class Mobs {
     /** Cerveau de combat (menace, déplacements, attaques). */
     IACombat ia() { return ia; }
     Butin butin() { return butin; }
+    Comportements comportements() { return comportements; }
     /** Tics écoulés depuis le démarrage des mobs. */
     long tics() { return tic; }
 
@@ -276,6 +280,16 @@ public final class Mobs {
         UUID etiquette;
         /** Barre de vie : dernières proportions posées (Vie, traîne) et hauteur au-dessus du mob. */
         float barreV = -1, barreT = -1, barreY;
+        /** Tic de son arrivée (chargement ou apparition), pour {@code duree-de-vie}. Relevé d'un tas d'os : ni butin ni XP. */
+        long ne;
+        boolean sansButin, assis;
+        /** Ronde : point visé, sens (aller-retour), arrêté jusqu'à ce tic. */
+        int rondeIndex = -1, rondeSens = 1;
+        long rondeArret;
+        /** Crâne qui court : endroit visé (tas d'os), cherché, tic d'arrivée (−1 : en route). */
+        Location fuiteVers;
+        boolean fuiteCherchee;
+        long arrive = -1;
 
         Suivi(Entity e, DefinitionMob d) {
             this.e = e;
@@ -350,6 +364,8 @@ public final class Mobs {
             if (d == null) continue;
             if (e instanceof LivingEntity le && le.isDead()) continue;
             Suivi s = new Suivi(e, d);
+            s.ne = tic;
+            s.sansButin = pdc.has(cleSansButin, PersistentDataType.BYTE);
             String[] m = pdc.getOrDefault(cleMaison, PersistentDataType.STRING, "").split(";");
             Location l = e.getLocation();
             s.mx = l.getX(); s.my = l.getY(); s.mz = l.getZ();
@@ -417,11 +433,7 @@ public final class Mobs {
                 // a-la-mort : ce qui naît à sa place (le crâne qui court du Squelette-mosaïque)
                 Mecaniques.Invocation inv = s.d.combat().meca().aLaMort();
                 if (inv != null) {
-                    Location ou = e.getLocation();
-                    for (int k = 0; k < inv.nombre(); k++) {
-                        try { invoquer(inv.mob(), ou.clone().add(hasard.nextDouble() - 0.5, 0.2, hasard.nextDouble() - 0.5), null, null, s.niveau); }
-                        catch (Throwable ex) { erreur("a-la-mort " + s.d.id(), ex); }
-                    }
+                    try { comportements.aLaMort(s, inv); } catch (Throwable ex) { erreur("a-la-mort " + s.d.id(), ex); }
                 }
             }
             ia.mort(s);
@@ -520,7 +532,64 @@ public final class Mobs {
             pdc.set(combats.cle(), PersistentDataType.STRING, String.format(Locale.ROOT, "%.2f;%d", d.combat().vieAuNiveau(n), n));
         }
         charger(List.of(e));
+        Suivi nouveau = suivis.get(e.getUniqueId());
+        if (nouveau != null && !d.decor()) {
+            try { comportements.apparition(nouveau); } catch (Throwable ex) { erreur("apparition " + d.id(), ex); }
+        }
         return e;
+    }
+
+    /** Mob relevé (tas d'os) : ni butin ni XP, même après un redémarrage. */
+    void marquerSansButin(Suivi s) {
+        s.sansButin = true;
+        s.e.getPersistentDataContainer().set(cleSansButin, PersistentDataType.BYTE, (byte) 1);
+    }
+
+    /**
+     * L'endroit le plus proche à {@code rayon} blocs : un point d'intérêt {@code type} des zones (« tas_os »,
+     * « depot_de_cire »), sinon un des {@code blocs} du monde (noms du jeu). Null s'il n'y en a pas.
+     */
+    Location endroitProche(Location l, String type, double rayon, List<String> blocs) {
+        World w = l.getWorld();
+        Location best = null;
+        double d = rayon * rayon;
+        if (type != null) {
+            for (Zone z : zones.values()) {
+                if (!z.monde().equals(w.getName())) continue;
+                for (Zone.Point p : z.points()) {
+                    if (!p.type().equalsIgnoreCase(type)) continue;
+                    double e = (p.x() - l.getX()) * (p.x() - l.getX()) + (p.z() - l.getZ()) * (p.z() - l.getZ());
+                    if (e <= d) { d = e; best = new Location(w, p.x(), p.y(), p.z()); }
+                }
+            }
+            if (best != null) return best;
+        }
+        if (blocs == null || blocs.isEmpty()) return null;
+        Set<Material> mats = new HashSet<>();
+        for (String b : blocs) { Material m = Material.matchMaterial(b); if (m != null && m.isBlock()) mats.add(m); }
+        if (mats.isEmpty()) return null;
+        int r = (int) Math.ceil(rayon), bx = l.getBlockX(), by = l.getBlockY(), bz = l.getBlockZ();
+        for (int dx = -r; dx <= r; dx++) {
+            for (int dz = -r; dz <= r; dz++) {
+                double e = dx * dx + dz * dz;
+                if (e > d) continue;
+                for (int dy = -3; dy <= 3; dy++) {
+                    Block b = w.getBlockAt(bx + dx, by + dy, bz + dz);
+                    if (!mats.contains(b.getType())) continue;
+                    // le pied du tas : un sol libre juste à côté du bloc
+                    Location pied = null;
+                    for (int[] c : new int[][]{{0, 0}, {1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
+                        Location s = sol(w, b.getX() + c[0] + 0.5, b.getY() + 1, b.getZ() + c[1] + 0.5, false);
+                        if (s != null && Math.abs(s.getY() - l.getY()) <= 4) { pied = s; break; }
+                    }
+                    if (pied == null) continue;
+                    d = e;
+                    best = pied;
+                    break;
+                }
+            }
+        }
+        return best;
     }
 
     static EntityType type(String nom) {
@@ -651,11 +720,16 @@ public final class Mobs {
             for (int k = 0; k < n; k++) {
                 String mob = a.mobs().get(hasard.nextInt(a.mobs().size()));
                 DefinitionMob dm = definition(mob);
-                // un mob de combat n'apparaît jamais dans une zone sûre
+                // un mob de combat n'apparaît jamais dans une zone sûre ; une sortie de paroi, jamais sous le nez d'un joueur
                 Location l = solAutour(w, a.x(), a.y(), a.z(), a.rayon(), dm != null && dm.combattant());
+                if (l != null && a.paroi() && joueurA(w, l, Apparition.DISTANCE_PAROI)) l = null;
                 if (l == null) continue;
                 Entity e = invoquer(mob, l, a.id(), a.troupeau() ? a.id() : null, a.niveau());
                 if (e == null) continue;
+                if (a.paroi()) {
+                    Suivi su = suivis.get(e.getUniqueId());
+                    if (su != null) { try { comportements.paroi(su); } catch (Throwable ex) { erreur("paroi " + a.id(), ex); } }
+                }
                 et.membres.add(e.getUniqueId());
                 et.positions.put(e.getUniqueId(), new double[]{l.getX(), l.getY(), l.getZ()});
                 apparus++;
@@ -667,6 +741,14 @@ public final class Mobs {
             registreModifie = true;
         }
         for (String g : vaguesDeGroupe) debutGroupe.remove(g);
+    }
+
+    /** Vrai si un joueur (hors spectateur) est à moins de {@code r} blocs. */
+    private static boolean joueurA(World w, Location l, double r) {
+        for (Player p : w.getPlayers()) {
+            if (p.getGameMode() != GameMode.SPECTATOR && p.getLocation().distanceSquared(l) < r * r) return true;
+        }
+        return false;
     }
 
     /**
@@ -757,8 +839,11 @@ public final class Mobs {
             try { combats.tic(suivis.values(), tic); } catch (Throwable ex) { erreur("combat", ex); }
         }
         try { ia.ticProjectiles(); } catch (Throwable ex) { erreur("projectiles", ex); }
+        if (tic % 5 == 0) {
+            try { comportements.tic(new ArrayList<>(suivis.values())); } catch (Throwable ex) { erreur("comportements", ex); }
+        }
         for (Suivi s : new ArrayList<>(suivis.values())) {
-            if (s.ia == null || (!s.ia.engage && !s.ia.rentre)) continue;
+            if (s.ia == null || (!s.ia.engage && !s.ia.rentre) || comportements.gere(s)) continue;
             try { ia.tic(s); } catch (Throwable ex) { erreur("combat " + s.d.id(), ex); }
         }
         for (Suivi s : suivis.values()) {
@@ -864,6 +949,8 @@ public final class Mobs {
         if (monte(e) || (e instanceof LivingEntity le && le.isLeashed())) return;
         // mob de combat : en combat (ou s'il voit un joueur), c'est le cerveau de combat qui le mène
         if (s.d.combattant() && ia.penser(s)) return;
+        // au calme : ronde, tertre, crâne qui court
+        if (s.d.combattant() && comportements.calme(s, mob)) return;
         double distMaison = Geometrie.distance(l.getX(), l.getZ(), s.mx, s.mz);
 
         if (s.d.ia().equals("jeu")) {

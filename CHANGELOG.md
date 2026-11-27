@@ -1,5 +1,40 @@
 # Journal des changements
 
+## 1.9.0 (étage 1 de Babel : butin spécial, butin de groupe, crâne qui court, munitions, ronde, paroi)
+
+- **Butin spécial** (`combat.butin-special`) :
+  - `chasseur: true` : pièce prélevable du Chasseur ; elle ne tombe pas, elle est rendue dans
+    `VoraceMobMortEvent.getPiecesPrelevables()` (joueur → objets) pour le plugin des métiers ;
+  - `si: <condition>` : seulement si la condition a été notée pendant le combat (`garde_brisee` est notée par vorace-mob,
+    les autres par `VoraceMobAPI.noterCondition(entite, condition)`) ; `si: par_...` se compte : chance × le nombre de
+    fois, 1 au plus ;
+  - `premier-kill: true` : une fois par joueur et par mob (`donnees/premiers-kills.yml`).
+- **Butin de groupe** : élites, élites ++, mini-boss et boss : chaque membre du combat qui a fait au moins 10 % des
+  contributions (dégâts, plus les soins et protections notés par `VoraceMobAPI.contribuer(entite, joueur, montant)`)
+  tire sa table, réservée à lui (`VoraceMobMortEvent.getButinDesMembres()`). Monstres normaux : le gagnant seul.
+- **Second coup** (`second-coup: { tic, forme, angle, rayon, multiplicateur }` d'une attaque) : le Double coup de massue
+  du Squelette-mosaïque frappe deux fois.
+- **Munitions** (`combat.munitions: { nombre, recharge, rayon, blocs }`, attaques `munitions:` et `apres-munitions:`) :
+  la Mèche-sourde tire 3 fois, puis marche au dépôt de cire le plus proche (point de zone `depot_de_cire`, sinon bloc
+  de rayon de miel à 12 blocs ; sur place sans dépôt) et recharge. `VoraceMobAPI.munitions`, `retirerMunitions` (une
+  branche coupée).
+- **Crâne qui court** : `a-la-mort` part de l'os `depart` du modèle, `delai` tics après la mort (le crâne saute de la
+  Mosaïque) ; `duree-de-vie` (il disparaît sans butin), `fuite: { vers: tas_os, rayon: 8 }` (point de zone, sinon bloc
+  d'os), `si-arrive: { releve, vie, delai }` : arrivé, le squelette se relève là avec 50 % de sa Vie, sans butin ni XP
+  (`VoraceMobMortEvent.isSansButin()`, `VoraceMobAPI.sansButin`).
+- **Tertre** (`combat.tertre: { assis, regen, attente, lever }`) : le Gardien est assis au calme (animation `assis`), se
+  lève à l'engagement (`se-lever`), ne récupère pas toute sa Vie en rentrant : 1 % par seconde après 10 s de calme.
+- **Ronde** (`ronde:` d'un point d'apparition ou de `combat:`) : aller-retour de point en point au calme, arrêt aux deux
+  bouts (`arret` en tics) ; sa maison suit (la laisse part du dernier point de sa ronde). Animation `marche` du mob.
+- **Sortie de paroi** (`apparition: paroi` d'un point) : le mob sort de la paroi la plus proche (fissure lumineuse de
+  30 tics, figé pendant ce temps), jamais à moins de 8 blocs d'un joueur.
+- **Animation d'apparition** : le rôle `apparition` des animations du mob est joué à chaque apparition.
+- **Phases** : `animations: { garde: idle_a_pied, marche-combat: marche_a_pied }` dans une phase change son repos et sa
+  marche à partir de là (le Passeur à pied, puis gardant sa lanterne).
+- Animations en boucle propres au mob (rôles `marche`, `garde`... de ses animations ou de ses phases) : elles se
+  remplacent l'une l'autre ; avant, une boucle au nom propre au mob restait jouée.
+- `/vmob info` : munitions, conditions notées, mob relevé.
+
 ## 1.8.0 (étage 1 de Babel : mécaniques du bestiaire et points d'apparition)
 
 - **Mécaniques des monstres** (bloc `combat:`) :

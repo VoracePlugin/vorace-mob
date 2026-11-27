@@ -151,6 +151,16 @@ final class Combats {
     }
 
     /** Rend de la Vie au mob (soins de ses alliés, retour au calme). */
+    /** Pose sa Vie à {@code vie} (mob relevé avec une part de sa Vie). */
+    void fixerVie(Mobs.Suivi s, double vie) {
+        if (s.vie <= 0) return;
+        s.vie = Math.max(1, Math.min(s.vieMax, vie));
+        s.vieTraine = s.vie;
+        sauver(s);
+        if (s.e instanceof LivingEntity le && le.isValid()) le.setHealth(Combat.santeDuJeu(s.vie, s.vieMax, SANTE));
+        afficher(s);
+    }
+
     void soigner(Mobs.Suivi s, double montant) {
         if (s.vie <= 0 || montant <= 0) return;
         s.vie = Math.min(s.vieMax, s.vie + montant);

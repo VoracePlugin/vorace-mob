@@ -55,6 +55,9 @@ import java.util.Locale;
  *   vie-max: 0.6             # seulement sous 60 % de Vie
  *   interruptible: true      # un contrôle pendant le signal l'annule
  *   animation-frappe: 7      # tic de l'animation où le geste frappe : elle est retardée pour qu'il tombe à la fin du signal
+ *   second-coup: { tic: 28, forme: cone, angle: 120, rayon: 2.2, multiplicateur: 0.5 }   # un 2e coup au tic 28 de l'attaque
+ *   munitions: 3             # elle use une munition du mob ({@code combat.munitions}) ; à zéro, elle ne part plus
+ *   apres-munitions: 3       # la recharge : seulement quand le mob n'a plus de munitions, elle les lui rend
  * </pre>
  */
 public record Competence(String id, String nom, String animation, Forme forme, double porteeMin, double porteeMax,
@@ -63,7 +66,27 @@ public record Competence(String id, String nom, String animation, Forme forme, d
                          int couleur, double poids, String annonce, String fixation, double vieMax, boolean interruptible,
                          int phase, double vitesse, double anticipation, int salve, int intervalle, int zones,
                          double dispersion, double repousse, double bond, int flaque, double flaqueMult, Effets effets,
-                         int presse, boolean lourde, int animationFrappe) {
+                         int presse, boolean lourde, int animationFrappe, SecondCoup secondCoup, boolean munitions,
+                         boolean rechargeMunitions) {
+
+    /**
+     * Deuxième coup d'une attaque (Double coup de massue) : au tic {@code tic} depuis son début, une autre forme (cône,
+     * cercle ou ligne) frappe avec {@code multiplicateur}.
+     */
+    public record SecondCoup(int tic, Forme forme, double rayon, double largeur, double multiplicateur) {
+        static SecondCoup lire(String mob, String id, ConfigurationSection s, Competence.Forme defaut, double rayon, List<String> problemes) {
+            if (s == null) return null;
+            Forme f = Forme.lire(s.getString("forme"));
+            if (f == null) f = defaut;
+            if (f == Forme.PROJECTILE || f == Forme.ZONE) {
+                problemes.add("mob " + mob + " : attaque « " + id + " » : second-coup en cone, cercle, ligne ou contact seulement");
+                f = Forme.CONE;
+            }
+            double larg = s.contains("angle") ? s.getDouble("angle") : s.getDouble("largeur", f == Forme.CONE ? 90 : 1);
+            return new SecondCoup(Math.max(1, s.getInt("tic", 20)), f, Math.max(0.5, s.getDouble("rayon", rayon > 0 ? rayon : 2.5)),
+                Math.max(0, larg), Math.max(0, s.getDouble("multiplicateur", 0.5)));
+        }
+    }
 
     /** Modèles animés des effets d'une attaque (null : particules). */
     public record Effets(String marque, String projectile, String impact, String pluie, String flaque) {
@@ -111,7 +134,10 @@ public record Competence(String id, String nom, String animation, Forme forme, d
     public int departAnimation() { return animationFrappe > 0 && signal > animationFrappe ? signal - animationFrappe : 0; }
 
     /** Durée totale (signal + actif + récupération), en tics. */
-    public int total() { return signal + actif + recuperation + (salve - 1) * intervalle; }
+    public int total() {
+        int t = signal + actif + recuperation + (salve - 1) * intervalle;
+        return secondCoup == null ? t : Math.max(t, secondCoup.tic());
+    }
 
     /** Couleur RGB de la zone marquée par défaut selon le type. */
     static int couleurDuType(String type) {
@@ -186,6 +212,9 @@ public record Competence(String id, String nom, String animation, Forme forme, d
             Math.max(1, s.getInt("intervalle", 4)), Math.max(1, s.getInt("zones", 1)), Math.max(0, s.getDouble("dispersion", rayon * 1.4)),
             Math.max(0, s.getDouble("repousse", 0)), s.getDouble("bond", 0), Math.max(0, s.getInt("flaque", 0)),
             Math.max(0, s.getDouble("flaque-multiplicateur", 0.25)), Effets.lire(s.getConfigurationSection("effets")),
-            Math.max(0, s.getInt("presse", bond < 0 ? 2 : 0)), lourde, Math.max(0, s.getInt("animation-frappe", 0)));
+            Math.max(0, s.getInt("presse", bond < 0 ? 2 : 0)), lourde, Math.max(0, s.getInt("animation-frappe", 0)),
+            SecondCoup.lire(mob, id, s.getConfigurationSection("second-coup"), f, rayon, problemes),
+            s.isBoolean("munitions") ? s.getBoolean("munitions") : s.getInt("munitions", 0) > 0,
+            s.isBoolean("apres-munitions") ? s.getBoolean("apres-munitions") : s.getInt("apres-munitions", 0) > 0);
     }
 }
