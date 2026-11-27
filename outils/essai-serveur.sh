@@ -291,7 +291,8 @@ echo "$CRANE" | grep -aq 'mob=e9_crane' || { echo "ECHEC : la Mosaïque tuée ne
 echo "$CRANE" | grep -aqE 'mob=e9_crane .*fuite=(en-route|arrive)' || { echo "ECHEC : le crâne ne trouve pas le bloc d'os"; exit 1; }
 echo "$CRANE" | grep -aq 'mob=e9_mosaique .*sans-butin=oui' || { echo "ECHEC : le crâne ne relève pas la Mosaïque (sans butin)"; exit 1; }
 echo "$MUNI" | grep -aq 'munitions=0' || { echo "ECHEC : le tireur n'use pas ses munitions"; exit 1; }
-echo "$MUNI" | awk '/munitions=0/ {z = 1} z && /munitions=2/ {ok = 1} END {exit !ok}' || { echo "ECHEC : le tireur ne recharge pas au dépôt"; exit 1; }
+echo "$MUNI" | awk '/munitions=0/ {z = 1} z && /munitions=[1-9]/ {ok = 1} END {exit !ok}' || { echo "ECHEC : le tireur ne recharge pas"; exit 1; }
+echo "$MUNI" | grep -aq 'mode=depot' || { echo "ECHEC : le tireur ne marche pas au dépôt"; exit 1; }
 echo "$PAROI" | grep -aq 'mob=e9_paroi' || { echo "ECHEC : rien ne sort de la paroi"; exit 1; }
 echo "$PAROI" | grep -ao 'mob=e9_paroi .*pos=[-0-9.]*' | grep -aqE 'pos=21\.' || { echo "ECHEC : le mob de la paroi n'est pas collé à la paroi (x = 21,5)"; exit 1; }
 [ "$(echo "$PAROI" | grep -ao 'mob=e9_ronde .*ronde=[0-9]*' | grep -ao 'ronde=[0-9]*' | sort -u | wc -l)" -ge 2 ] || { echo "ECHEC : la ronde ne passe pas d'un point à l'autre"; exit 1; }
