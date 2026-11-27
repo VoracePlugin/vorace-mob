@@ -499,10 +499,10 @@ public final class TestMobs {
         verifier(cr9.meca().dureeDeVie() == 160 && cr9.meca().fuite().vers().equals("tas_os") && cr9.meca().fuite().blocs().contains("bone_block")
             && cr9.meca().siArrive().mob().equals("e1_squelette_mosaique") && cr9.meca().siArrive().vie() == 0.5 && cr9.meca().siArrive().delai() == 60,
             "crâne qui court : 8 s de vie, fuit vers un tas d'os (bloc d'os), relève la Mosaïque à 50 % au bout de 3 s");
-        Competence goutte = me9.competences().stream().filter(x -> x.id().equals("goutte")).findFirst().get();
+        Competence goutte9 = me9.competences().stream().filter(x -> x.id().equals("goutte")).findFirst().get();
         Competence rech = me9.competences().stream().filter(x -> x.id().equals("recharge")).findFirst().get();
-        verifier(me9.meca().munitions().nombre() == 3 && me9.meca().munitions().blocs().contains("honeycomb_block") && goutte.munitions()
-            && !goutte.rechargeMunitions() && rech.rechargeMunitions() && !rech.munitions(), "Mèche-sourde : 3 munitions, recharge au dépôt de cire");
+        verifier(me9.meca().munitions().nombre() == 3 && me9.meca().munitions().blocs().contains("honeycomb_block") && goutte9.munitions()
+            && !goutte9.rechargeMunitions() && rech.rechargeMunitions() && !rech.munitions(), "Mèche-sourde : 3 munitions, recharge au dépôt de cire");
         verifier(ga9.meca().tertre().assis() && ga9.meca().tertre().regen() == 0.01 && ga9.meca().tertre().attente() == 200, "Gardien : assis, 1 % par seconde après 10 s");
         verifier("idle_a_pied".equals(IACombat.animDePhase(pa9, 1, "garde")) && "marche_a_pied".equals(IACombat.animDePhase(pa9, 2, "marche-combat"))
             && "idle_garde".equals(IACombat.animDePhase(pa9, 2, "garde")) && IACombat.animDePhase(pa9, 0, "garde") == null,
@@ -511,12 +511,12 @@ public final class TestMobs {
         int[] n1 = ro.suivant(1, 1), n2 = ro.suivant(2, 1), n3 = ro.suivant(0, -1);
         verifier(ro.points().size() == 3 && ro.arret() == 300 && n1[0] == 2 && n2[0] == 1 && n2[1] == -1 && n3[0] == 1 && n3[1] == 1
             && ro.bout(0) && ro.bout(2) && !ro.bout(1) && ro.plusProche(236, 70) == 2, "ronde : aller-retour, arrêt aux deux bouts");
-        java.util.UUID ja = new java.util.UUID(0, 1), jb = new java.util.UUID(0, 2), jc = new java.util.UUID(0, 3);
-        java.util.Map<java.util.UUID, Double> dg = java.util.Map.of(ja, 900.0, jb, 95.0, jc, 5.0);
-        verifier(Butin.membres(Combat.Rang.NORMAL, dg, java.util.Map.of()).equals(List.of(ja))
-            && Butin.membres(Combat.Rang.ELITE, dg, java.util.Map.of()).size() == 1
-            && Butin.membres(Combat.Rang.ELITE, dg, java.util.Map.of(jc, 120.0)).containsAll(List.of(ja, jc))
-            && Butin.membres(Combat.Rang.BOSS, java.util.Map.of(ja, 500.0, jb, 500.0), java.util.Map.of()).size() == 2,
+        java.util.UUID j9a = new java.util.UUID(0, 1), j9b = new java.util.UUID(0, 2), j9c = new java.util.UUID(0, 3);
+        java.util.Map<java.util.UUID, Double> dg9 = java.util.Map.of(j9a, 900.0, j9b, 95.0, j9c, 5.0);
+        verifier(Butin.membres(Combat.Rang.NORMAL, dg9, java.util.Map.of()).equals(List.of(j9a))
+            && Butin.membres(Combat.Rang.ELITE, dg9, java.util.Map.of()).size() == 1
+            && Butin.membres(Combat.Rang.ELITE, dg9, java.util.Map.of(j9c, 120.0)).containsAll(List.of(j9a, j9c))
+            && Butin.membres(Combat.Rang.BOSS, java.util.Map.of(j9a, 500.0, j9b, 500.0), java.util.Map.of()).size() == 2,
             "butin de groupe : élites et boss, chaque membre à 10 % (dégâts + soins) ; monstre normal : le gagnant seul");
         Apparition ap9 = Apparition.lire("faucheuse", YamlConfiguration.loadConfiguration(new java.io.StringReader(
             "a: { mob: e1_faucheuse_errante, centre: [230.5, 41, 40.5], apparition: paroi, ronde: { points: [[230, 41], [229, 60]], arret: 300 } }")).getConfigurationSection("a"), pb);
