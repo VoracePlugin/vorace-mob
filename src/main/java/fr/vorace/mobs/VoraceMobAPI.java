@@ -295,6 +295,12 @@ public final class VoraceMobAPI {
         return s != null && s.sansButin;
     }
 
+    /** Rang porté par un objet de butin tiré à un autre rang que sa base (« rare »), ou null. */
+    public static String rangObjet(org.bukkit.inventory.ItemStack o) {
+        if (o == null || !o.hasItemMeta()) return null;
+        return o.getItemMeta().getPersistentDataContainer().get(Butin.CLE_RANG, org.bukkit.persistence.PersistentDataType.STRING);
+    }
+
     /** Le coup que ce mob porte en ce moment (pendant l'événement de dégâts de son coup), ou null. */
     public static CoupMob coupEnCours(Entity e) {
         Mobs.Suivi s = combattant(e);

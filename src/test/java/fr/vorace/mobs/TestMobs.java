@@ -523,6 +523,21 @@ public final class TestMobs {
         verifier(ap9.paroi() && ap9.ronde() != null && ap9.ronde().points().size() == 2 && !simple.paroi() && simple.ronde() == null,
             "points d'apparition : sortie de paroi et ronde lues");
 
+        // 1.10.0 : rang porté par les objets de butin (spectre)
+        Rangs rg = new Rangs();
+        pb.clear();
+        rg.lire("essai", YamlConfiguration.loadConfiguration(new java.io.StringReader(String.join("\n",
+            "objets:",
+            "  e1_crane_fele: { base: Peu commune, spectre: { Commune: 20, Peu commune: 70, Rare: 10 } }",
+            "  e1_eclat_lanterne: { base: rare, spectre: { peu_commun: 20, rare: 78, epique: 2 } }",
+            "  e1_os_aventurier: { base: commun }"))), pb);
+        Rangs.Spectre cf = rg.spectre("e1_crane_fele"), el = rg.spectre("E1_ECLAT_LANTERNE");
+        verifier(pb.isEmpty() && rg.taille() == 3 && cf.base().equals("peu_commun") && cf.tirer(0.1).equals("commun") && cf.tirer(0.5).equals("peu_commun")
+            && cf.tirer(0.95).equals("rare") && el.tirer(0.99).equals("epique") && rg.spectre("e1_os_aventurier").tirer(0.7).equals("commun"),
+            "rangs : spectre lu (noms du jeu ou identifiants), tirage du plus courant au plus rare");
+        verifier("peu_commun".equals(Rangs.lire("Peu commune")) && "divin".equals(Rangs.lire("Divine")) && "epique".equals(Rangs.lire("Épique"))
+            && Rangs.lire("bizarre") == null, "rangs : noms affichés reconnus");
+
         System.out.println(echecs == 0 ? "TOUS LES TESTS PASSENT" : echecs + " ECHEC(S)");
         System.exit(echecs == 0 ? 0 : 1);
     }

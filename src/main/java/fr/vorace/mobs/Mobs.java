@@ -53,6 +53,7 @@ public final class Mobs {
     private Map<String, DefinitionMob> definitions = Map.of();
     private Map<String, Zone> zones = Map.of();
     private Map<String, Apparition> apparitions = Map.of();
+    private Rangs rangs = new Rangs();
     private final Map<UUID, Suivi> suivis = new LinkedHashMap<>();
     private final Map<String, EtatApparition> registre = new HashMap<>();
     private Map<String, List<Suivi>> troupeaux = new HashMap<>();
@@ -104,6 +105,7 @@ public final class Mobs {
     IACombat ia() { return ia; }
     Butin butin() { return butin; }
     Comportements comportements() { return comportements; }
+    Rangs rangs() { return rangs; }
     /** Tics écoulés depuis le démarrage des mobs. */
     long tics() { return tic; }
 
@@ -190,11 +192,24 @@ public final class Mobs {
             if (plugin.modeles() != null) for (String m : d.modeles()) if (plugin.modeles().modele(m) == null) problemes.add("mob " + d.id() + " : modèle animé inconnu « " + m + " »");
             if (!d.decor() && type(d.type()) == null) problemes.add("mob " + d.id() + " : entité inconnue « " + d.type() + " »");
         }
+        Rangs rg = new Rangs();
+        Path dr = dossier().resolve("rangs");
+        if (Files.isDirectory(dr)) {
+            try (Stream<Path> f = Files.walk(dr)) {
+                for (Path p : f.filter(x -> x.toString().toLowerCase(Locale.ROOT).endsWith(".yml")).sorted().toList()) {
+                    rg.lire("rangs/" + p.getFileName(), YamlConfiguration.loadConfiguration(p.toFile()), problemes);
+                }
+            } catch (IOException e) {
+                problemes.add("rangs : lecture impossible (" + e.getMessage() + ")");
+            }
+        }
         definitions = defs;
         zones = zs;
         apparitions = apps;
+        rangs = rg;
         problemes.forEach(p -> plugin.getLogger().warning("Mobs : " + p));
-        plugin.getLogger().info(defs.size() + " mob(s), " + zs.size() + " zone(s), " + apps.size() + " point(s) d'apparition");
+        plugin.getLogger().info(defs.size() + " mob(s), " + zs.size() + " zone(s), " + apps.size() + " point(s) d'apparition"
+            + (rg.taille() > 0 ? ", " + rg.taille() + " objet(s) à rang tiré" : ""));
         lireRegistre();
         if (tache != null && Bukkit.isPrimaryThread()) {
             // rechargement : les mobs en jeu reprennent leur nouvelle définition

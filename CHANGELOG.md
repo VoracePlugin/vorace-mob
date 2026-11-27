@@ -1,5 +1,13 @@
 # Journal des changements
 
+## 1.10.0 (rang porté par les objets de butin)
+
+- Fichiers `rangs/*.yml` : pour un objet de Vorace, son rang de base et son spectre (`objets: { e1_crane_fele: { base:
+  peu_commun, spectre: { commun: 20, peu_commun: 70, rare: 10 } } }`). Chaque exemplaire tombé tire son rang ; s'il n'est
+  pas au rang de base, il porte `vorace:rang` et `vorace:rang_base` (lus par Matsuri Économie 0.4.0 : × 2 par rang
+  au-dessus, × 0,5 en dessous), son nom prend la couleur du rang et sa description le nom du rang (« Rare » au lieu de
+  « Peu commune »). Au rang de base, rien ne change (il s'empile avec les autres). `VoraceMobAPI.rangObjet(objet)`.
+
 ## 1.9.0 (étage 1 de Babel : butin spécial, butin de groupe, crâne qui court, munitions, ronde, paroi)
 
 - **Butin spécial** (`combat.butin-special`) :

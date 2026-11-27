@@ -56,6 +56,20 @@ final class Butin {
     List<ItemStack> objets(String id, int n) {
         List<ItemStack> l = new ArrayList<>();
         if (!estItem(id)) {
+            String t = id.trim().toLowerCase(Locale.ROOT);
+            Rangs.Spectre sp = t.startsWith("vorace:") && plugin.mobs() != null ? plugin.mobs().rangs().spectre(t.substring(7)) : null;
+            if (sp != null && n > 0) {
+                // rang porté : chaque exemplaire tire son rang dans le spectre de l'objet ; une pile par rang
+                Map<String, Integer> parRang = new java.util.LinkedHashMap<>();
+                for (int k = 0; k < n; k++) parRang.merge(sp.tirer(hasard.nextDouble()), 1, Integer::sum);
+                for (Map.Entry<String, Integer> x : parRang.entrySet()) {
+                    ItemStack o = objet(id, x.getValue());
+                    if (o == null) continue;
+                    marquerRang(o, x.getKey(), sp.base());
+                    l.add(o);
+                }
+                return l;
+            }
             ItemStack o = objet(id, n);
             if (o != null) l.add(o);
             return l;
@@ -69,6 +83,40 @@ final class Butin {
             n -= pile;
         }
         return l;
+    }
+
+    static final org.bukkit.NamespacedKey CLE_RANG = new org.bukkit.NamespacedKey("vorace", "rang"),
+        CLE_RANG_BASE = new org.bukkit.NamespacedKey("vorace", "rang_base");
+
+    /**
+     * Un exemplaire tiré à un autre rang que son rang de base : le rang est écrit sur l'objet ({@code vorace:rang},
+     * {@code vorace:rang_base}, lus par le barème de Matsuri Économie), son nom prend la couleur du rang et sa description
+     * le nom du rang. Au rang de base, l'objet reste tel quel (il s'empile avec les autres).
+     */
+    static void marquerRang(ItemStack o, String rang, String base) {
+        if (rang == null || rang.equals(base)) return;
+        Rangs.Rang r = Rangs.rang(rang), b = Rangs.rang(base);
+        if (r == null) return;
+        o.editMeta(m -> {
+            m.getPersistentDataContainer().set(CLE_RANG, org.bukkit.persistence.PersistentDataType.STRING, rang);
+            if (base != null) m.getPersistentDataContainer().set(CLE_RANG_BASE, org.bukkit.persistence.PersistentDataType.STRING, base);
+            net.kyori.adventure.text.format.TextColor c = net.kyori.adventure.text.format.TextColor.fromHexString(r.couleur());
+            net.kyori.adventure.text.Component nom = m.hasDisplayName() ? m.displayName() : null;
+            if (nom != null) {
+                String brut = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(nom);
+                m.displayName(net.kyori.adventure.text.Component.text(brut).color(c)
+                    .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
+            }
+            List<net.kyori.adventure.text.Component> lore = m.lore();
+            if (lore != null && b != null) {
+                List<net.kyori.adventure.text.Component> nv = new ArrayList<>();
+                for (net.kyori.adventure.text.Component ligne : lore) {
+                    nv.add(ligne.replaceText(net.kyori.adventure.text.TextReplacementConfig.builder().matchLiteral(b.nom()).once()
+                        .replacement(net.kyori.adventure.text.Component.text(r.nom()).color(c)).build()));
+                }
+                m.lore(nv);
+            }
+        });
     }
 
     /** Ligne de butin d'un modèle de vorace-item : « item:&lt;modèle&gt; ». */
