@@ -302,7 +302,8 @@ for m in mouton vache cochon cheval poule chat lapin renard cerf sanglier ecureu
   awk -v p="${D:-0}" 'BEGIN {exit !(p > 1.0)}' || ZOO_KO=1
 done
 [ $ZOO_KO = 0 ] || { echo "ECHEC : une sorte de mob ne bouge pas toute seule en 45 s"; exit 1; }
-if grep -ao 'maison=[0-9.]*/[0-9]*' journal.txt | awk -F'[=/]' '$2 > $3 + 2 {bad=1} END {exit !bad}'; then echo "ECHEC : un mob est sorti de sa laisse"; exit 1; fi
+# (les mobs déplacés à la main par l'essai — tp — ne comptent pas : essaim et entité de quête du bestiaire)
+if grep -a 'maison=' journal.txt | grep -av 'mob=e9_fantome\|mob=e9_essaim' | grep -ao 'maison=[0-9.]*/[0-9]*' | awk -F'[=/]' '$2 > $3 + 2 {bad=1} END {exit !bad}'; then echo "ECHEC : un mob est sorti de sa laisse"; exit 1; fi
 echo "===== Étage 1 de Babel (1.9.0)"
 CRANE=$(phase 'ESSAI-E1-CRANE' 'ESSAI-E1-MUNITIONS' | grep -a 'mob=e9_')
 MUNI=$(phase 'ESSAI-E1-MUNITIONS' 'ESSAI-E1-PAROI' | grep -a 'mob=e9_tireur')
