@@ -239,13 +239,14 @@ cmd "vmob invoquer e9_fantome"
 sleep 1
 cmd "tp @e[type=endermite,limit=1] 30 -60 32"
 cmd "tp @e[type=zombie,limit=1] 40.5 -60 40.5"
+cmd "tp Testeur 30 -60 40"
 sleep 3
 cmd "execute if block 30 -60 30 minecraft:soul_torch run say ETEINT-OUI"
 cmd "damage @e[type=zombie,limit=1] 50 minecraft:generic"
 cmd "kill @e[type=endermite]"
 sleep 3
 cmd "execute if block 30 -60 30 minecraft:torch run say RALLUME-OUI"
-cmd "vmob info e9_fantome"
+cmd "vmob info e9_fantome Testeur"
 cmd "say ESSAI-E1-FIN"
 wait $BOT
 sleep 1
