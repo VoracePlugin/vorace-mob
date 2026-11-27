@@ -30,11 +30,13 @@ import java.util.Locale;
  * @param paroi        {@code apparition: paroi} : ils sortent d'une paroi (fissure lumineuse de {@link #FISSURE} tics), jamais
  *                     à moins de {@link #DISTANCE_PAROI} blocs d'un joueur
  * @param ronde        ronde de ses mobs au calme (ou null)
+ * @param eveil        {@code cache: { eveil: 3 }} : la vague due attend, cachée, qu'un joueur passe à ces blocs du centre
+ *                     (embuscade d'un dépôt d'ossements) ; 0 : jamais cachée
  */
 public record Apparition(String id, List<String> mobs, String monde, double x, double y, double z, double rayon, int nombre,
                          boolean troupeau, double laisse, double reapparition, String zone, int niveau, double cycle,
                          double chance, String groupe, double xpMult, Combat.Lot bonus, String pauseSalle, double pauseJoueur,
-                         double pauseMax, double entraide, boolean paroi, Mecaniques.Ronde ronde) {
+                         double pauseMax, double entraide, boolean paroi, Mecaniques.Ronde ronde, double eveil) {
 
     /** Durée de la fissure lumineuse d'une sortie de paroi (tics). */
     public static final int FISSURE = 30;
@@ -78,6 +80,7 @@ public record Apparition(String id, List<String> mobs, String monde, double x, d
      *   entraide: 0                # facultatif : distance d'entraide des mobs de ce point (0 : on les prend un par un)
      *   apparition: paroi          # facultatif : ils sortent d'une paroi proche (fissure lumineuse de 1,5 s)
      *   ronde: { points: [[230, 41], [229, 60], [236, 73]], arret: 300 }   # facultatif : ronde au calme (aller-retour)
+     *   cache: { eveil: 3 }        # facultatif : la vague attend, cachée, qu'un joueur passe à 3 blocs (embuscade)
      * </pre>
      */
     public static Apparition lire(String id, ConfigurationSection s, List<String> problemes) {
@@ -95,7 +98,8 @@ public record Apparition(String id, List<String> mobs, String monde, double x, d
                 Math.max(0, Math.min(1, s.getDouble("chance", 1))), s.getString("groupe"), Math.max(0, s.getDouble("xp-multiplicateur", 1)),
                 bonus(id, s, problemes), s.getString("pause-si-salle"), Math.max(0, s.getDouble("pause-si-joueur", 0)),
                 Math.max(0, s.getDouble("pause-max", 0)), s.contains("entraide") ? Math.max(0, s.getDouble("entraide", 0)) : -1,
-                "paroi".equalsIgnoreCase(s.getString("apparition", "")), Mecaniques.Ronde.lire("apparition " + id, s.getConfigurationSection("ronde"), problemes));
+                "paroi".equalsIgnoreCase(s.getString("apparition", "")), Mecaniques.Ronde.lire("apparition " + id, s.getConfigurationSection("ronde"), problemes),
+                Math.max(0, s.getDouble("cache.eveil", 0)));
         } catch (RuntimeException e) {
             problemes.add("apparition " + id + " : centre mal écrit");
             return null;

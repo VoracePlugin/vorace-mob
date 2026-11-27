@@ -226,6 +226,17 @@ final class Comportements {
         else naitre.run();
     }
 
+    /** {@code eclair-a-la-mort} : un éclair aveugle les joueurs autour (essaim de phalènes). */
+    void eclair(Mobs.Suivi s, Mecaniques.Eclair ec) {
+        Location l = s.e.getLocation();
+        l.getWorld().spawnParticle(Particle.END_ROD, l.clone().add(0, 1, 0), 30, 0.6, 0.6, 0.6, 0.25);
+        l.getWorld().playSound(l, Sound.ENTITY_FIREWORK_ROCKET_BLAST, 0.8f, 1.6f);
+        for (Player p : l.getWorld().getPlayers()) {
+            if (p.getGameMode() == GameMode.SPECTATOR || p.getLocation().distanceSquared(l) > ec.rayon() * ec.rayon()) continue;
+            p.addPotionEffect(new org.bukkit.potion.PotionEffect(org.bukkit.potion.PotionEffectType.BLINDNESS, ec.aveuglement(), 0, false, false));
+        }
+    }
+
     /** Son animation d'apparition (rôle « apparition »), s'il en a une. */
     void apparition(Mobs.Suivi s) {
         Modeles.Instance m = modele(s);

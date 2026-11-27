@@ -295,6 +295,17 @@ public final class VoraceMobAPI {
         return s != null && s.sansButin;
     }
 
+    /**
+     * Purification posée sur ce mob ({@code secondes}) : son aura ({@code combat.aura}, l'Os-violon) s'éteint le temps
+     * qu'elle dure. Faux si ce n'est pas un mob de combat.
+     */
+    public static boolean purifier(Entity e, double secondes) {
+        Mobs.Suivi s = combattant(e);
+        if (s == null) return false;
+        plugin.mobs().ia().purifier(s, Math.round(secondes * 1000));
+        return true;
+    }
+
     /** Rang porté par un objet de butin tiré à un autre rang que sa base (« rare »), ou null. */
     public static String rangObjet(org.bukkit.inventory.ItemStack o) {
         if (o == null || !o.hasItemMeta()) return null;

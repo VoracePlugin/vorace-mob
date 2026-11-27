@@ -77,6 +77,8 @@ public final class Mobs {
         boolean rempli;
         /** Cycle : instant où le premier mob a manqué (0 : rien ne manque). Pas sauvegardé : le cycle repart au redémarrage. */
         long debutManque;
+        /** Point caché ({@code cache}) : mobs de la vague due qui attendent qu'un joueur passe tout près. */
+        int attente;
     }
 
     public Mobs(VoraceMob plugin) {
@@ -450,6 +452,10 @@ public final class Mobs {
                 if (inv != null) {
                     try { comportements.aLaMort(s, inv); } catch (Throwable ex) { erreur("a-la-mort " + s.d.id(), ex); }
                 }
+                Mecaniques.Eclair ec = s.d.combat().meca().eclairALaMort();
+                if (ec != null) {
+                    try { comportements.eclair(s, ec); } catch (Throwable ex) { erreur("eclair " + s.d.id(), ex); }
+                }
             }
             ia.mort(s);
             combats.mort(s);
@@ -731,31 +737,61 @@ public final class Mobs {
                 et.rempli = true;
                 continue;
             }
-            int apparus = 0;
-            for (int k = 0; k < n; k++) {
-                String mob = a.mobs().get(hasard.nextInt(a.mobs().size()));
-                DefinitionMob dm = definition(mob);
-                // un mob de combat n'apparaît jamais dans une zone sûre ; une sortie de paroi, jamais sous le nez d'un joueur
-                Location l = solAutour(w, a.x(), a.y(), a.z(), a.rayon(), dm != null && dm.combattant());
-                if (l != null && a.paroi() && joueurA(w, l, Apparition.DISTANCE_PAROI)) l = null;
-                if (l == null) continue;
-                Entity e = invoquer(mob, l, a.id(), a.troupeau() ? a.id() : null, a.niveau());
-                if (e == null) continue;
-                if (a.paroi()) {
-                    Suivi su = suivis.get(e.getUniqueId());
-                    if (su != null) { try { comportements.paroi(su); } catch (Throwable ex) { erreur("paroi " + a.id(), ex); } }
-                }
-                et.membres.add(e.getUniqueId());
-                et.positions.put(e.getUniqueId(), new double[]{l.getX(), l.getY(), l.getZ()});
-                apparus++;
-            }
-            if (apparus == 0) continue;     // rien posé (zone sûre, mob inconnu) : prochain passage
-            et.debutManque = 0;
-            if (et.rempli) et.derniereMort = maintenant;
-            et.rempli = true;
-            registreModifie = true;
+            // embuscade : la vague attend, cachée, qu'un joueur passe tout près (révélée par reveillerCaches)
+            if (a.eveil() > 0) { et.attente = Math.max(et.attente, n); continue; }
+            if (poser(a, et, w, n, maintenant) == 0) continue;     // rien posé (zone sûre, mob inconnu) : prochain passage
         }
         for (String g : vaguesDeGroupe) debutGroupe.remove(g);
+    }
+
+    /** Pose {@code n} mobs du point ; renvoie le nombre posé (et note la vague s'il y en a). */
+    private int poser(Apparition a, EtatApparition et, World w, int n, long maintenant) {
+        int apparus = 0;
+        for (int k = 0; k < n; k++) {
+            String mob = a.mobs().get(hasard.nextInt(a.mobs().size()));
+            DefinitionMob dm = definition(mob);
+            // un mob de combat n'apparaît jamais dans une zone sûre ; une sortie de paroi, jamais sous le nez d'un joueur
+            Location l = solAutour(w, a.x(), a.y(), a.z(), a.rayon(), dm != null && dm.combattant());
+            if (l != null && a.paroi() && joueurA(w, l, Apparition.DISTANCE_PAROI)) l = null;
+            if (l == null) continue;
+            Entity e = invoquer(mob, l, a.id(), a.troupeau() ? a.id() : null, a.niveau());
+            if (e == null) continue;
+            if (a.paroi()) {
+                Suivi su = suivis.get(e.getUniqueId());
+                if (su != null) { try { comportements.paroi(su); } catch (Throwable ex) { erreur("paroi " + a.id(), ex); } }
+            }
+            et.membres.add(e.getUniqueId());
+            et.positions.put(e.getUniqueId(), new double[]{l.getX(), l.getY(), l.getZ()});
+            apparus++;
+        }
+        if (apparus == 0) return 0;
+        et.debutManque = 0;
+        if (et.rempli) et.derniereMort = maintenant;
+        et.rempli = true;
+        registreModifie = true;
+        return apparus;
+    }
+
+    /** Toutes les 5 tics : les vagues cachées ({@code cache}) sortent quand un joueur passe à leur distance d'éveil. */
+    void reveillerCaches() {
+        for (Apparition a : apparitions.values()) {
+            if (a.eveil() <= 0) continue;
+            EtatApparition et = registre.get(a.id());
+            if (et == null || et.attente <= 0) continue;
+            World w = Bukkit.getWorld(a.monde());
+            if (w == null) continue;
+            Location centre = new Location(w, a.x(), a.y(), a.z());
+            boolean proche = false;
+            for (Player p : w.getPlayers()) {
+                if (p.getGameMode() == GameMode.SPECTATOR || p.getGameMode() == GameMode.CREATIVE) continue;
+                if (Math.abs(p.getLocation().getY() - a.y()) < 4 && Geometrie.distance(p.getLocation().getX(), p.getLocation().getZ(), a.x(), a.z()) <= a.eveil() + a.rayon()) { proche = true; break; }
+            }
+            if (!proche) continue;
+            int n = Math.min(et.attente, a.nombre() - et.membres.size());
+            et.attente = 0;
+            if (n > 0) poser(a, et, w, n, System.currentTimeMillis());
+            w.playSound(centre, org.bukkit.Sound.BLOCK_BONE_BLOCK_BREAK, 1f, 0.6f);
+        }
     }
 
     /** Vrai si un joueur (hors spectateur) est à moins de {@code r} blocs. */
@@ -856,6 +892,7 @@ public final class Mobs {
         try { ia.ticProjectiles(); } catch (Throwable ex) { erreur("projectiles", ex); }
         if (tic % 5 == 0) {
             try { comportements.tic(new ArrayList<>(suivis.values())); } catch (Throwable ex) { erreur("comportements", ex); }
+            try { reveillerCaches(); } catch (Throwable ex) { erreur("caches", ex); }
         }
         for (Suivi s : new ArrayList<>(suivis.values())) {
             if (s.ia == null || (!s.ia.engage && !s.ia.rentre) || comportements.gere(s)) continue;

@@ -22,14 +22,27 @@ import java.util.Locale;
  *   munitions: { nombre: 3, recharge: depot_de_cire, rayon: 12, blocs: [honeycomb_block] }   # tirs avant de recharger
  *   tertre: { assis: true, regen: 0.01, attente: 200, lever: 30 }   # assis au calme ; 1 % de Vie par seconde au calme
  *   ronde: { points: [[230, 41], [229, 60]], vitesse: 1, boucle: false, arret: 300 }   # au calme, il fait sa ronde
+ *   famille: cire                                                   # famille (soins d'allié de la Moulière)
+ *   eclair-a-la-mort: { rayon: 6, aveuglement: 20 }                 # sa mort aveugle les joueurs autour
+ *   aura: { rayon: 10, degats: 0.2, purification: true }            # les mobs autour frappent plus fort
  * </pre>
  *
  * Sans Bukkit, sauf la lecture.
  */
 public record Mecaniques(Invocation aLaMort, Garde garde, PointFaible pointFaible, boolean jamaisMortel, int dureeDeVie,
-                         Fuite fuite, Releve siArrive, Munitions munitions, Tertre tertre, Ronde ronde) {
+                         Fuite fuite, Releve siArrive, Munitions munitions, Tertre tertre, Ronde ronde, String famille,
+                         Eclair eclairALaMort, Aura aura) {
 
-    public static final Mecaniques AUCUNE = new Mecaniques(null, null, null, false, 0, null, null, null, null, null);
+    public static final Mecaniques AUCUNE = new Mecaniques(null, null, null, false, 0, null, null, null, null, null, null, null, null);
+
+    /** À sa mort, un éclair aveugle les joueurs à {@code rayon} blocs pendant {@code aveuglement} tics (essaim de phalènes). */
+    public record Eclair(double rayon, int aveuglement) {}
+
+    /**
+     * Aura (Os-violon) : les autres mobs de combat à {@code rayon} blocs frappent × (1 + {@code degats}) tant qu'il vit ;
+     * {@code purification} : une Purification ({@link VoraceMobAPI#purifier}) l'éteint le temps qu'elle dure.
+     */
+    public record Aura(double rayon, double degats, boolean purification) {}
 
     /** Mobs qui naissent à sa mort (le crâne qui court du Squelette-mosaïque), depuis l'os {@code depart}, {@code delai} tics après. */
     public record Invocation(String mob, int nombre, String depart, int delai) {
@@ -194,8 +207,16 @@ public record Mecaniques(Invocation aLaMort, Garde garde, PointFaible pointFaibl
         if (ts != null) te = new Tertre(ts.getBoolean("assis", true), Math.max(0, Math.min(1, ts.getDouble("regen", 0.01))),
             Math.max(0, ts.getInt("attente", 200)), Math.max(0, ts.getInt("lever", 30)));
         Ronde ro = Ronde.lire("mob " + id, s.getConfigurationSection("ronde"), problemes);
-        if (inv == null && g == null && pf == null && !jamais && duree == 0 && fu == null && rel == null && mu == null && te == null && ro == null)
+        String fam = s.getString("famille");
+        Eclair ec = null;
+        ConfigurationSection es = s.getConfigurationSection("eclair-a-la-mort");
+        if (es != null) ec = new Eclair(Math.max(1, es.getDouble("rayon", 6)), Math.max(1, es.getInt("aveuglement", 20)));
+        Aura au = null;
+        ConfigurationSection as = s.getConfigurationSection("aura");
+        if (as != null) au = new Aura(Math.max(1, as.getDouble("rayon", 10)), Math.max(0, as.getDouble("degats", 0.2)), as.getBoolean("purification", true));
+        if (inv == null && g == null && pf == null && !jamais && duree == 0 && fu == null && rel == null && mu == null && te == null && ro == null
+            && fam == null && ec == null && au == null)
             return AUCUNE;
-        return new Mecaniques(inv, g, pf, jamais, duree, fu, rel, mu, te, ro);
+        return new Mecaniques(inv, g, pf, jamais, duree, fu, rel, mu, te, ro, fam == null ? null : fam.toLowerCase(Locale.ROOT), ec, au);
     }
 }

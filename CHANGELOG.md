@@ -1,5 +1,22 @@
 # Journal des changements
 
+## 1.11.0 (étage 1 de Babel : embuscades, invocations, soins d'allié, aura, neutres)
+
+- **Embuscade** (`cache: { eveil: 3 }` d'un point d'apparition) : la vague due attend, cachée, qu'un joueur passe à 3
+  blocs du point (en plus de son rayon), puis sort d'un coup avec son animation d'apparition (dépôts d'ossements et leurs
+  Squelettes rampants). Vérifié toutes les 5 tics.
+- **Neutre** (`neutre: true` du mob) : il n'attaque que si on le frappe (Glaneur, Lame-orpheline).
+- **Attaques, en plus** :
+  - `invocation: { mob, nombre, max, total }` : au coup, ces mobs naissent autour de lui et prennent sa cible ; `max`
+    vivants à la fois, `total` sur tout le combat (âmes enragées de la lanterne du Passeur : 3, 6, 24) ;
+  - `phase-max: 1` : seulement jusqu'à cette phase ;
+  - `soin-allie: { cible, seuil, soin }` : la Refonte de la Moulière soigne un allié de la famille `cire` sous 30 % de Vie,
+    de 40 % ; elle ne part que s'il y en a un ;
+  - `interrompu-par: 2` : 2 coups reçus pendant le signal l'interrompent (condition `interrompu_<attaque>` notée).
+- **Mécaniques** : `famille: cire` ; `eclair-a-la-mort: { rayon, aveuglement }` (l'essaim de phalènes aveugle en mourant) ;
+  `aura: { rayon, degats, purification }` (l'Os-violon : les mobs à 10 blocs frappent × 1,2 ; une Purification l'éteint,
+  `VoraceMobAPI.purifier(entite, secondes)`, appelée par Matsuri Cœur 0.44.1).
+
 ## 1.10.0 (rang porté par les objets de butin)
 
 - Fichiers `rangs/*.yml` : pour un objet de Vorace, son rang de base et son spectre (`objets: { e1_crane_fele: { base:

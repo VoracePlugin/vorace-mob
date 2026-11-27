@@ -95,6 +95,9 @@ final class IACombat {
         boolean depotCherche;
         /** Tic du retour au calme (tertre : regain après une attente). */
         long calmeDepuis;
+        /** Mobs invoqués par ses attaques pendant ce combat ; purifié (aura éteinte) jusqu'à ce tic. */
+        int invoques;
+        long purifieJusqua;
 
         /** Joueurs comptés pour la Vie et les dégâts (1 au moins). */
         int joueurs() { return Math.max(1, Math.max(joueursImposes, verrouilles.size())); }
@@ -297,7 +300,7 @@ final class IACombat {
         e.verrouilles.clear(); e.joueursImposes = 0;
         e.coupsGardes = 0; e.gardeBriseeJusqua = 0; e.gardeBrisee = false;
         e.conditions.clear(); e.soutiens.clear();
-        e.munitions = -1; e.depot = null; e.depotCherche = false; e.secondFait = false;
+        e.munitions = -1; e.depot = null; e.depotCherche = false; e.secondFait = false; e.invoques = 0;
         e.calmeDepuis = tic();
         mobs.combats().ajusterGroupe(s);   // retour à 1 joueur
         cacherBarre(s);
@@ -329,6 +332,7 @@ final class IACombat {
         if (s.ia == null) return false;
         if (s.ia.engage || s.ia.rentre) return true;
         if (!(s.e instanceof Mob mob) || s.vie <= 0) return false;
+        if (s.d.neutre()) return false;   // neutre : il n'attaque que si on le frappe
         double r = s.d.combat().ia().aggro();
         Player meilleur = null;
         double best = r * r;
@@ -795,6 +799,15 @@ final class IACombat {
         for (Competence a : attendre ? List.<Competence>of() : cb.competences()) {
             if (t < e.prete.getOrDefault(a.id(), 0L) || e.phase < a.phase() || ratio > a.vieMax()) continue;
             if (a.rechargeMunitions() || (a.munitions() && e.munitions == 0)) continue;
+            if (a.phaseMax() >= 0 && e.phase > a.phaseMax()) continue;
+            if (a.invocation() != null && !peutInvoquer(e, a.invocation())) continue;
+            if (a.soinAllie() != null) {
+                // soin d'un allié : seulement s'il y en a un à soigner, à sa portée (la cible joueur ne compte pas)
+                if (allieABlesse(s, a) == null) continue;
+                pretes.add(a);
+                total += a.poids();
+                continue;
+            }
             if (recus < a.presse() || (sansLourde && a.lourde())) continue;
             boolean ok = switch (a.forme()) {
                 case CERCLE -> d <= a.porteeMax() + 0.3;
@@ -1057,6 +1070,69 @@ final class IACombat {
         return true;
     }
 
+    /** Vrai s'il peut encore invoquer : {@code max} vivants à la fois, {@code total} sur le combat. */
+    private static boolean peutInvoquer(Etat e, Competence.Invocation inv) {
+        if (inv.total() > 0 && e.invoques >= inv.total()) return false;
+        if (inv.max() <= 0) return true;
+        int vivants = 0;
+        for (UUID u : e.invocations) { Entity x = Bukkit.getEntity(u); if (x != null && x.isValid() && !x.isDead()) vivants++; }
+        return vivants < inv.max();
+    }
+
+    /** Ses invocations naissent autour de lui et prennent sa cible (dans les limites de {@code max} et {@code total}). */
+    private void invoquer(Mobs.Suivi s, Mob mob, Competence.Invocation inv, Player cible) {
+        Etat e = s.ia;
+        e.invocations.removeIf(u -> { Entity x = Bukkit.getEntity(u); return x == null || !x.isValid() || x.isDead(); });
+        for (int k = 0; k < inv.nombre(); k++) {
+            if ((inv.max() > 0 && e.invocations.size() >= inv.max()) || (inv.total() > 0 && e.invoques >= inv.total())) break;
+            double a = 2 * Math.PI * k / inv.nombre() + hasard.nextDouble();
+            Location ou = Mobs.sol(mob.getWorld(), mob.getLocation().getX() + Math.cos(a) * 2.5, mob.getLocation().getY(),
+                mob.getLocation().getZ() + Math.sin(a) * 2.5, false);
+            if (ou == null) ou = mob.getLocation();
+            Entity x = mobs.invoquer(inv.mob(), ou, null, null, s.niveau);
+            if (x == null) continue;
+            e.invocations.add(x.getUniqueId());
+            e.invoques++;
+            Mobs.Suivi o = mobs.suivi(x);
+            if (o != null && cible != null) ajouterMenace(o, cible, 10);
+        }
+    }
+
+    /** L'allié de sa famille le plus blessé sous le seuil de la compétence, à sa portée ; null s'il n'y en a pas. */
+    private Mobs.Suivi allieABlesse(Mobs.Suivi s, Competence c) {
+        Competence.SoinAllie sa = c.soinAllie();
+        double portee = Math.max(2, c.porteeMax() + 1), best = sa.seuil();
+        Mobs.Suivi choisi = null;
+        for (Mobs.Suivi o : mobs.suivis()) {
+            if (o == s || !o.d.combattant() || o.vie <= 0 || !o.e.isValid() || !o.e.getWorld().equals(s.e.getWorld())) continue;
+            if (!sa.cible().isEmpty() && !sa.cible().equals(o.d.combat().meca().famille())) continue;
+            if (o.e.getLocation().distanceSquared(s.e.getLocation()) > portee * portee) continue;
+            double r = o.vie / Math.max(1, o.vieMax);
+            if (r < best) { best = r; choisi = o; }
+        }
+        return choisi;
+    }
+
+    /** Bonus de dégâts des auras alliées (Os-violon) autour de ce mob : × (1 + la plus forte). */
+    double aura(Mobs.Suivi s) {
+        double bonus = 0;
+        long t = tic();
+        for (Mobs.Suivi o : mobs.suivis()) {
+            Mecaniques.Aura au = o == s || !o.d.combattant() ? null : o.d.combat().meca().aura();
+            if (au == null || o.vie <= 0 || !o.e.isValid() || !o.e.getWorld().equals(s.e.getWorld())) continue;
+            if (au.purification() && o.ia != null && t < o.ia.purifieJusqua) continue;
+            if (o.e.getLocation().distanceSquared(s.e.getLocation()) > au.rayon() * au.rayon()) continue;
+            bonus = Math.max(bonus, au.degats());
+        }
+        return 1 + bonus;
+    }
+
+    /** Purification posée sur ce mob : son aura s'éteint {@code ms}. */
+    void purifier(Mobs.Suivi s, long ms) {
+        if (s.ia == null) return;
+        s.ia.purifieJusqua = Math.max(s.ia.purifieJusqua, tic() + Math.max(1, ms / 50));
+    }
+
     /** Après son coup, le mob bondit (en arrière si {@code bond} est négatif) ; il cherche un côté libre si un mur le gêne. */
     private void bondir(Mobs.Suivi s, Mob mob, Competence c) {
         Vector dir = s.ia.direction.clone().multiply(c.bond() < 0 ? -1 : 1);
@@ -1105,6 +1181,16 @@ final class IACombat {
 
     private void executer(Mobs.Suivi s, Mob mob, Competence c, Player vise, int k) {
         if (k == 0) s.ia.attaques++;
+        if (k == 0 && c.invocation() != null) invoquer(s, mob, c.invocation(), vise);
+        if (c.soinAllie() != null) {
+            Mobs.Suivi al = allieABlesse(s, c);
+            if (al != null) {
+                mobs.combats().soigner(al, al.vieMax * c.soinAllie().soin());
+                al.e.getWorld().spawnParticle(Particle.HAPPY_VILLAGER, al.e.getLocation().add(0, 1, 0), 12, 0.4, 0.6, 0.4, 0);
+                al.e.getWorld().playSound(al.e.getLocation(), Sound.BLOCK_HONEY_BLOCK_PLACE, 1f, 0.7f);
+            }
+            return;
+        }
         Location l = mob.getLocation();
         World w = l.getWorld();
         switch (c.forme()) {
@@ -1184,7 +1270,7 @@ final class IACombat {
      * {@code part} : part des dégâts (1 pour le coup, moins pour une flaque).
      */
     void toucher(Mobs.Suivi s, Mob mob, Competence c, Player p, double part) {
-        CoupMob coup = CoupMob.de(s.d.combat(), s.niveau, c, s.ia.bonus * part * s.d.combat().facteurDegats(s.ia.joueurs()));
+        CoupMob coup = CoupMob.de(s.d.combat(), s.niveau, c, s.ia.bonus * part * s.d.combat().facteurDegats(s.ia.joueurs()) * aura(s));
         s.coupEnCours = coup;
         s.sansAnimAuto = true;
         // le recul du jeu ne s'applique pas : un coup ne repousse que par son réglage « repousse » (plus bas)
@@ -1397,8 +1483,20 @@ final class IACombat {
     void coupRecu(Mobs.Suivi s, Player p) {
         if (s.ia == null) return;
         rejoindre(s, p);
-        s.ia.coups.addLast(tic());
+        long t = tic();
+        s.ia.coups.addLast(t);
         while (s.ia.coups.size() > 8) s.ia.coups.removeFirst();
+        // « interrompu-par » : assez de coups pendant le signal l'interrompent (la Refonte de la Moulière)
+        Competence c = s.ia.enCours;
+        if (c != null && c.interrompuPar() > 0 && t - s.ia.t0 < c.signal() && coupsRecus(s.ia.coups, t, (int) (t - s.ia.t0)) >= c.interrompuPar()) {
+            s.ia.prete.put(c.id(), t + c.recharge() / 2);
+            s.ia.enCours = null;
+            retirerMarques(s.ia);
+            Modeles.Instance m = modele(s);
+            if (m != null && c.animation() != null && c.animation().equals(m.animation())) m.arreterAnimation();
+            s.e.getWorld().playSound(s.e.getLocation(), Sound.BLOCK_FIRE_EXTINGUISH, 1f, 1f);
+            noter(s, "interrompu_" + c.id(), 1);
+        }
     }
 
     // ================================================================== zones marquées

@@ -538,6 +538,32 @@ public final class TestMobs {
         verifier("peu_commun".equals(Rangs.lire("Peu commune")) && "divin".equals(Rangs.lire("Divine")) && "epique".equals(Rangs.lire("Épique"))
             && Rangs.lire("bizarre") == null, "rangs : noms affichés reconnus");
 
+        // 1.11.0 : neutre, invocation, phase-max, soin d'allié, interrompu-par, éclair à la mort, aura, embuscade
+        YamlConfiguration y11 = YamlConfiguration.loadConfiguration(new java.io.StringReader(String.join("\n",
+            "glaneur: { type: husk, neutre: true, combat: { niveau: 4, vie: 900 } }",
+            "passeur: { type: husk, combat: { niveau: 5, vie: 1000, competences: { lanterne: { forme: cercle, rayon: 3, invocation: { mob: e1_ame_enragee, nombre: 3, max: 6, total: 24 } },",
+            "  taille: { forme: cone, rayon: 3, phase-max: 1 } } } }",
+            "mouliere: { type: husk, combat: { niveau: 3, vie: 500, famille: cire, competences: { refonte: { forme: contact, portee: 4, signal: 60,",
+            "  soin-allie: { cible: cire, seuil: 0.3, soin: 0.4 }, interrompu-par: 2 } } } }",
+            "phalene: { type: husk, combat: { niveau: 1, vie: 100, eclair-a-la-mort: { rayon: 6, aveuglement: 20 } } }",
+            "violon: { type: husk, combat: { niveau: 2, vie: 200, aura: { rayon: 10, degats: 0.2, purification: true } } }")));
+        pb.clear();
+        DefinitionMob gl11 = DefinitionMob.lire("glaneur", y11.getConfigurationSection("glaneur"), pb);
+        Combat pa11 = DefinitionMob.lire("passeur", y11.getConfigurationSection("passeur"), pb).combat();
+        Combat mo11 = DefinitionMob.lire("mouliere", y11.getConfigurationSection("mouliere"), pb).combat();
+        Combat ph11 = DefinitionMob.lire("phalene", y11.getConfigurationSection("phalene"), pb).combat();
+        Combat vi11 = DefinitionMob.lire("violon", y11.getConfigurationSection("violon"), pb).combat();
+        Competence lan = pa11.competences().stream().filter(x -> x.id().equals("lanterne")).findFirst().get();
+        Competence tai = pa11.competences().stream().filter(x -> x.id().equals("taille")).findFirst().get();
+        Competence ref = mo11.competences().get(0);
+        verifier(pb.isEmpty() && gl11.neutre() && lan.invocation().nombre() == 3 && lan.invocation().max() == 6 && lan.invocation().total() == 24
+            && tai.phaseMax() == 1 && lan.phaseMax() == -1 && "cire".equals(mo11.meca().famille()) && ref.soinAllie().soin() == 0.4
+            && ref.interrompuPar() == 2 && ph11.meca().eclairALaMort().aveuglement() == 20 && vi11.meca().aura().degats() == 0.2,
+            "neutre, invocation (max, total), phase-max, famille, soin d'allié, interrompu-par, éclair à la mort, aura");
+        Apparition ap11 = Apparition.lire("cache", YamlConfiguration.loadConfiguration(new java.io.StringReader(
+            "a: { mob: e1_squelette_rampant, centre: [122.5, 40, 298.5], cache: { eveil: 3 } }")).getConfigurationSection("a"), pb);
+        verifier(ap11.eveil() == 3 && simple.eveil() == 0, "embuscade : la vague attend un joueur à 3 blocs");
+
         System.out.println(echecs == 0 ? "TOUS LES TESTS PASSENT" : echecs + " ECHEC(S)");
         System.exit(echecs == 0 ? 0 : 1);
     }
