@@ -13,8 +13,11 @@ import java.util.Locale;
  * qui s'y trouve n'est plus une cible (ni touché par leurs attaques). Les autres mobs (animaux, décors) y vivent.
  *
  * @param sure vrai pour une zone sûre
+ * @param plafond mobs de combat vivants au plus dans la zone ({@code plafond: 45}) : au-delà, les points d'apparition
+ *                attendent ; 0 = sans plafond
  */
-public record Zone(String id, String monde, String forme, double[] xs, double[] zs, double rayon, List<Point> points, boolean sure) {
+public record Zone(String id, String monde, String forme, double[] xs, double[] zs, double rayon, List<Point> points, boolean sure,
+                   int plafond) {
 
     /** Point d'intérêt : un endroit où trouver à manger, à boire, ou s'abriter pour la nuit. */
     public record Point(String type, double x, double y, double z) {}
@@ -73,6 +76,7 @@ public record Zone(String id, String monde, String forme, double[] xs, double[] 
     public static Zone lire(String id, ConfigurationSection s, List<String> problemes) {
         String monde = s.getString("monde", "world");
         boolean sure = s.getBoolean("sure", false);
+        int plafond = Math.max(0, s.getInt("plafond", 0));
         List<Point> points = new ArrayList<>();
         for (java.util.Map<?, ?> m : s.getMapList("points")) {
             Object type = m.get("type"), pos = m.get("position");
@@ -86,11 +90,11 @@ public record Zone(String id, String monde, String forme, double[] xs, double[] 
         try {
             if (s.isList("cercle")) {
                 List<?> c = s.getList("cercle");
-                return new Zone(id, monde, "cercle", new double[]{num(c.get(0))}, new double[]{num(c.get(1))}, num(c.get(2)), points, sure);
+                return new Zone(id, monde, "cercle", new double[]{num(c.get(0))}, new double[]{num(c.get(1))}, num(c.get(2)), points, sure, plafond);
             }
             if (s.isList("rectangle")) {
                 List<?> r = s.getList("rectangle");
-                return new Zone(id, monde, "rectangle", new double[]{num(r.get(0)), num(r.get(2))}, new double[]{num(r.get(1)), num(r.get(3))}, 0, points, sure);
+                return new Zone(id, monde, "rectangle", new double[]{num(r.get(0)), num(r.get(2))}, new double[]{num(r.get(1)), num(r.get(3))}, 0, points, sure, plafond);
             }
             if (s.isList("polygone")) {
                 List<?> p = s.getList("polygone");
@@ -101,7 +105,7 @@ public record Zone(String id, String monde, String forme, double[] xs, double[] 
                     zs[i] = num(c.get(1));
                 }
                 if (xs.length < 3) throw new IllegalArgumentException("au moins 3 sommets");
-                return new Zone(id, monde, "polygone", xs, zs, 0, points, sure);
+                return new Zone(id, monde, "polygone", xs, zs, 0, points, sure, plafond);
             }
         } catch (RuntimeException e) {
             problemes.add("zone " + id + " : forme mal écrite (" + e.getMessage() + ")");

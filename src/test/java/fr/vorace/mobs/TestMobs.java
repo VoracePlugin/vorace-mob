@@ -618,6 +618,10 @@ public final class TestMobs {
         verifier(DefinitionMob.lire("glaneur", y12.getConfigurationSection("glaneur"), pb).quete() == Speciaux.Quete.AUCUNE
             && simple.toString() != null, "un mob de combat n'est pas une entité de quête");
 
+        Zone zp = Zone.lire("z", YamlConfiguration.loadConfiguration(new java.io.StringReader("z: { monde: donjon, rectangle: [0, 0, 10, 10], plafond: 12 }"))
+            .getConfigurationSection("z"), pb);
+        verifier(zp != null && zp.plafond() == 12 && zp.contient(5, 5), "plafond d'une zone");
+
         System.out.println(echecs == 0 ? "TOUS LES TESTS PASSENT" : echecs + " ECHEC(S)");
         System.exit(echecs == 0 ? 0 : 1);
     }

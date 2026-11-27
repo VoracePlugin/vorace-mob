@@ -231,7 +231,9 @@ final class Bestiaire implements Listener {
         }
         if (s.d.quete().invulnerable()) s.e.setInvulnerable(true);
         // entité de quête : ni l'IA du jeu ni celle de Vorace, le bestiaire la mène (ronde, regard)
-        if (s.d.quete() != Speciaux.Quete.AUCUNE && !s.d.combattant() && !s.d.volant() && s.e instanceof Mob mob) mob.setAware(false);
+        if (s.d.quete() != Speciaux.Quete.AUCUNE && !s.d.combattant() && s.e instanceof Mob mob) mob.setAware(false);
+        // une entité de quête volante qui fait sa ronde : c'est la ronde qui la mène (pas le vol de Vorace)
+        if (s.d.quete().ronde() != null && s.d.volant()) { s.vol = null; s.e.setGravity(false); }
         Speciaux.Mob sp = sp(s);
         if (sp.leurre() != null && !s.sansButin) poserBallot(s, e, sp.leurre());
     }
@@ -1528,10 +1530,9 @@ final class Bestiaire implements Listener {
         }
         double nx = l.getX() + dx / d * pas, nz = l.getZ() + dz / d * pas;
         double y = l.getY();
-        if (!s.d.volant()) {
-            Location sol = Mobs.sol(l.getWorld(), nx, l.getY() + 1, nz, false);
-            if (sol != null && Math.abs(sol.getY() - l.getY()) < 2.5) y = sol.getY();
-        }
+        double haut = s.d.volant() ? (s.d.altMin() + s.d.altMax()) / 2 : 0;   // volante : elle flotte au-dessus du sol
+        Location sol = Mobs.sol(l.getWorld(), nx, l.getY() - haut + 1, nz, false);
+        if (sol != null && Math.abs(sol.getY() + haut - l.getY()) < 3.5) y = sol.getY() + haut;
         float yaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
         s.e.teleport(new Location(l.getWorld(), nx, y, nz, yaw, 0));
         Modeles.Instance m = modele(s);

@@ -753,9 +753,29 @@ public final class Mobs {
         for (String g : vaguesDeGroupe) debutGroupe.remove(g);
     }
 
+    /**
+     * Places sous le plafond des zones qui contiennent (x, z) ({@code plafond} : mobs de combat vivants au plus) ;
+     * {@link Integer#MAX_VALUE} sans plafond.
+     */
+    int placeSousPlafond(World w, double x, double z) {
+        int place = Integer.MAX_VALUE;
+        for (Zone zo : zones.values()) {
+            if (zo.plafond() <= 0 || !w.getName().equals(zo.monde()) || !zo.contient(x, z)) continue;
+            int vivants = 0;
+            for (Suivi s : suivis.values()) {
+                if (!s.d.combattant() || !s.e.isValid() || !s.e.getWorld().equals(w)) continue;
+                Location l = s.e.getLocation();
+                if (zo.contient(l.getX(), l.getZ())) vivants++;
+            }
+            place = Math.min(place, Math.max(0, zo.plafond() - vivants));
+        }
+        return place;
+    }
+
     /** Pose {@code n} mobs du point ; renvoie le nombre posé (et note la vague s'il y en a). */
     private int poser(Apparition a, EtatApparition et, World w, int n, long maintenant) {
         int apparus = 0;
+        n = Math.min(n, placeSousPlafond(w, a.x(), a.z()));   // zone pleine (plafond) : la vague attend
         for (int k = 0; k < n; k++) {
             String mob = a.mobs().get(hasard.nextInt(a.mobs().size()));
             DefinitionMob dm = definition(mob);

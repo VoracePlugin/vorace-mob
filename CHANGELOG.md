@@ -15,8 +15,8 @@
   qui la fixe 4 s), Faucheuse (`vision`), Mèche qui vise la lumière (`cible: lumiere`), Feu-follet qui fuit vers un
   cul-de-sac puis appelle (`appel`, condition `avant_appel`), Lame-orpheline qui tend sa poignée (`offrande`) et se rend
   à 1 de Vie (`invincible`), ballot de la Porte-Fardeau (`leurre`, `e1.ballot_ramasse`), Glaneur qui ramasse les objets
-  perdus à la mort d'un joueur (`sac` : rendus s'il meurt, troc `e1.troc_glaneur`), Lanceur qui tourne lentement
-  (`rotation`), âme enragée qui explose en fin de vie (`fin-de-vie`) et en frappant (`sacrifice`).
+  perdus à la mort d'un joueur (`sac` : rendus s'il meurt, troc `e1.troc_glaneur`), Squelette lancier qui tourne
+  lentement (`rotation`), âme enragée qui explose en fin de vie (`fin-de-vie`) et en frappant (`sacrifice`).
 - **Passeur** : tête-lanterne (partie détachée qui tourne au-dessus de lui, 6 % de sa Vie : détruite, il frappe au hasard
   et prend +20 % 6 s, elle revient 20 s plus tard), lanterne posée en phase 3 (le corps ne prend plus que 20 % ; la
   lanterne fêlée l'achève), charge contre une paroi (`contre-paroi` : étourdi 3 s), garde centrée sur la lanterne.
@@ -32,6 +32,8 @@
   `visiblePour(entite, joueurs)` ; `fragmentsAme(joueur)`. Défense ÷ 2 dans `stat` quand le mob est ramolli.
 - Correction : un mob avec `fuite` mais sans `si-arrive` (Feu-follet) n'est plus mené comme le crâne qui court (il ne
   disparaissait plus en arrivant au bout de sa fuite, il se bat).
+- **Plafond des zones** (`plafond: 45` d'une zone) : au-delà de ce nombre de mobs de combat vivants dans la zone, les
+  points d'apparition attendent.
 - Essai serveur : l'essaim baisse une torche puis la rallume, l'entité de quête est invulnérable et fait sa ronde.
 
 ## 1.11.0 (étage 1 de Babel : embuscades, invocations, soins d'allié, aura, neutres)
