@@ -175,11 +175,11 @@ cmd "vmob info cr_"
 sleep 5
 cmd "vmob info cr_"
 cmd "vmob menace 32"
-# zone sûre : le faux joueur est dans un cercle de 4 blocs (sure: true) ; les mobs de combat lâchent leur cible. Sans la
+# zone sûre : le faux joueur est dans un cercle de 8 blocs (un coup qui repousse ne l en sort pas) (sure: true) ; les mobs de combat lâchent leur cible. Sans la
 # zone, ils le reprennent pour cible (la preuve que c'est elle qui les arrête).
 mkdir -p plugins/VoraceMob/zones
 cat > plugins/VoraceMob/zones/refuge.yml <<'ZONE'
-refuge: { monde: world, cercle: [1.5, -6.5, 4], sure: true }
+refuge: { monde: world, cercle: [1.5, -6.5, 8], sure: true }
 ZONE
 cmd "say ESSAI-ZS-1"
 cmd "vmob recharger"
