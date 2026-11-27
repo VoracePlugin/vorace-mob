@@ -622,6 +622,16 @@ public final class TestMobs {
             .getConfigurationSection("z"), pb);
         verifier(zp != null && zp.plafond() == 12 && zp.contient(5, 5), "plafond d'une zone");
 
+        // 1.13.0 : cycle raccourci quand plusieurs groupes de joueurs sont là
+        List<double[]> g13 = List.of(new double[]{0, 0}, new double[]{8, 0}, new double[]{15, 0}, new double[]{40, 40}, new double[]{60, 0});
+        verifier(Apparition.groupes(g13) == 3 && Apparition.groupes(List.of()) == 0 && Apparition.facteurGroupes(1) == 1
+            && Math.abs(Apparition.facteurGroupes(3) - 0.7) < 1e-9 && Apparition.facteurGroupes(9) == 0.6,
+            "groupes de joueurs (de proche en proche, 12 blocs) ; cycle × 0,85 par groupe en plus, 60 % au moins");
+        Apparition cy13 = Apparition.lire("c", YamlConfiguration.loadConfiguration(new java.io.StringReader(
+            "c: { mob: m, centre: [0, 0, 0], cycle: 100 }")).getConfigurationSection("c"), pb);
+        verifier(!cy13.vagueDue(1_000 + 69_000, 1_000, 0.7) && cy13.vagueDue(1_000 + 70_000, 1_000, 0.7) && !cy13.vagueDue(1_000 + 70_000, 1_000),
+            "cycle de 100 s : à 3 groupes, la vague revient au bout de 70 s");
+
         System.out.println(echecs == 0 ? "TOUS LES TESTS PASSENT" : echecs + " ECHEC(S)");
         System.exit(echecs == 0 ? 0 : 1);
     }

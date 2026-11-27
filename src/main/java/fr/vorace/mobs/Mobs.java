@@ -713,6 +713,14 @@ public final class Mobs {
             }
             int manque = a.nombre() - et.membres.size();
             if (manque <= 0) { et.rempli = true; et.debutManque = 0; continue; }
+            // plusieurs groupes de joueurs autour du point : les monstres reviennent plus vite (60 % du cycle au plus court)
+            List<double[]> autour = new ArrayList<>();
+            for (Player p : w.getPlayers()) {
+                if (p.getGameMode() == GameMode.SPECTATOR) continue;
+                Location pl = p.getLocation();
+                if (Geometrie.distance(pl.getX(), pl.getZ(), a.x(), a.z()) <= Apparition.RAYON_GROUPES) autour.add(new double[]{pl.getX(), pl.getZ()});
+            }
+            double facteur = Apparition.facteurGroupes(Apparition.groupes(autour));
             if (a.cycle() > 0 && et.rempli && et.debutManque == 0) et.debutManque = maintenant;
             // pause (Chapelle des cierges) : pas de vague pendant le combat du boss, ni sous les yeux d'un joueur ;
             // jamais plus de « pause-max » secondes sans vague
@@ -732,11 +740,11 @@ public final class Mobs {
                 // points d'un même « groupe » partagent ce départ (un groupe mêlé revient en une vague)
                 long debut = et.debutManque;
                 if (a.groupe() != null) debut = debutGroupe.merge(a.groupe(), et.debutManque, Math::min);
-                if (!a.vagueDue(maintenant, debut)) continue;
+                if (!a.vagueDue(maintenant, debut, facteur)) continue;
                 if (a.groupe() != null) vaguesDeGroupe.add(a.groupe());
                 n = manque;
             } else {
-                if (et.rempli && maintenant - et.derniereMort < a.reapparition() * 1000) continue;
+                if (et.rempli && maintenant - et.derniereMort < a.reapparition() * 1000 * facteur) continue;
                 n = et.rempli ? 1 : manque;
             }
             // monstre rare : une chance par tour ; raté, il faut attendre le tour suivant
@@ -1033,6 +1041,7 @@ public final class Mobs {
         if (s.d.combattant() && ia.penser(s)) return;
         // au calme : ronde, tertre, crâne qui court
         if (s.d.combattant() && comportements.calme(s, mob)) return;
+        if (bestiaire.calme(s)) return;   // Glaneur qui suit un groupe ou va ramasser un sac
         double distMaison = Geometrie.distance(l.getX(), l.getZ(), s.mx, s.mz);
 
         if (s.d.ia().equals("jeu")) {

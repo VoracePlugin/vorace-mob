@@ -84,6 +84,8 @@ final class Bestiaire implements Listener {
         /** Glaneur : sacs portés. */
         final List<Sac> sacs = new ArrayList<>();
         Sac sacVise;
+        /** Le bestiaire le mène hors combat (Glaneur qui suit un groupe ou va au sac) jusqu'à ce tic. */
+        long meneJusqua;
         /** Lame-orpheline : à qui elle tend sa poignée, progression, refus, déjà proposée à ces joueurs. */
         UUID offreA;
         int offreProgres, refus;
@@ -325,7 +327,10 @@ final class Bestiaire implements Listener {
         IACombat.Etat ia = s.ia;
         // une attaque vient de finir : la tête découverte (Porte-Fardeau)
         if (ia != null) {
-            if (e.derniereAttaque != null && ia.enCours == null && sp.ouverture() != null) e.ouvertureJusqua = t + sp.ouverture().duree();
+            if (e.derniereAttaque != null && ia.enCours == null && sp.ouverture() != null) {
+                e.ouvertureJusqua = t + sp.ouverture().duree();
+                jouer(s, "ouverture", false);
+            }
             e.derniereAttaque = ia.enCours;
             if (ia.engage && !e.appelFait && !ia.conditions.containsKey("avant_appel") && aUnAppel(s)) ia.conditions.put("avant_appel", 1);
         }
@@ -1060,6 +1065,64 @@ final class Bestiaire implements Listener {
         });
     }
 
+    /** Vrai si le bestiaire mène ce mob au calme (son cerveau ne choisit pas où aller). */
+    boolean calme(Mobs.Suivi s) {
+        Etat e = etats.get(s.e.getUniqueId());
+        return e != null && now() < e.meneJusqua;
+    }
+
+    /** Distance (blocs) à laquelle le Glaneur suit les joueurs qui se battent : entre 15 et 25. */
+    static final double SUIT_MIN = 15, SUIT_MAX = 25;
+
+    /** Un joueur qui se bat (un mob de combat engagé l'a dans sa table de menace), le plus proche à 48 blocs, ou null. */
+    private Player joueurQuiSeBat(Location l) {
+        Player meilleur = null;
+        double best = 48 * 48;
+        for (Mobs.Suivi o : mobs.suivis()) {
+            if (o.ia == null || !o.ia.engage || !o.e.getWorld().equals(l.getWorld())) continue;
+            for (UUID u : o.ia.menace.keySet()) {
+                Player p = Bukkit.getPlayer(u);
+                if (p == null || !p.getWorld().equals(l.getWorld())) continue;
+                double d = p.getLocation().distanceSquared(l);
+                if (d < best) { best = d; meilleur = p; }
+            }
+        }
+        return meilleur;
+    }
+
+    /** Le Glaneur se tient à 15-25 blocs d'un joueur qui se bat, hors de sa vue si possible. */
+    private void suivre(Mobs.Suivi s, Etat e, Mob mob, long t) {
+        Player p = joueurQuiSeBat(mob.getLocation());
+        if (p == null) return;
+        Location l = mob.getLocation(), pl = p.getLocation();
+        double d = l.distance(pl);
+        e.meneJusqua = t + 30;
+        if (d >= SUIT_MIN && d <= SUIT_MAX) {
+            mob.getPathfinder().stopPathfinding();
+            IACombat.regarder(mob, pl);
+            return;
+        }
+        // point voulu : sur la droite joueur → Glaneur, à 20 blocs du joueur ; on essaie aussi à ±40° pour sortir de sa vue
+        Vector dir = l.toVector().subtract(pl.toVector()).setY(0);
+        if (dir.lengthSquared() < 1e-4) dir = new Vector(1, 0, 0);
+        dir.normalize();
+        Location vise = null;
+        for (double angle : new double[]{0, 40, -40, 80, -80}) {
+            double a = Math.toRadians(angle), c = Math.cos(a), sn = Math.sin(a);
+            Vector v = new Vector(dir.getX() * c - dir.getZ() * sn, 0, dir.getX() * sn + dir.getZ() * c).multiply(20);
+            Location sol = Mobs.sol(pl.getWorld(), pl.getX() + v.getX(), pl.getY() + 2, pl.getZ() + v.getZ(), false);
+            if (sol == null) continue;
+            if (vise == null) vise = sol;
+            if (!p.hasLineOfSight(mob) || angle != 0) {
+                // hors de la vue du joueur : on garde ce point
+                Location yeux = sol.clone().add(0, 1.6, 0);
+                if (p.getWorld().rayTraceBlocks(p.getEyeLocation(), yeux.toVector().subtract(p.getEyeLocation().toVector()).normalize(),
+                    p.getEyeLocation().distance(yeux)) != null) { vise = sol; break; }
+            }
+        }
+        if (vise != null) mob.getPathfinder().moveTo(vise, d > SUIT_MAX + 10 ? 1.2 : 0.9);
+    }
+
     private void glaner(Mobs.Suivi s, Etat e, Speciaux.Sac sa, long t) {
         if (!(s.e instanceof Mob mob) || (s.ia != null && s.ia.engage)) return;
         if (e.sacVise != null && !sacsAuSol.contains(e.sacVise)) e.sacVise = null;
@@ -1071,7 +1134,8 @@ final class Bestiaire implements Listener {
                 if (d < best) { best = d; e.sacVise = x; }
             }
         }
-        if (e.sacVise == null) return;
+        if (e.sacVise == null) { suivre(s, e, mob, t); return; }
+        e.meneJusqua = t + 30;
         if (mob.getLocation().distanceSquared(e.sacVise.ou) > 2.2 * 2.2) {
             mob.getPathfinder().moveTo(e.sacVise.ou, 1.0);
             return;
@@ -1224,7 +1288,7 @@ final class Bestiaire implements Listener {
         }
         if (proche == null) return;
         if (e.proposes.add(proche.getUniqueId())) {
-            jouer(s, "offrande", true);
+            jouer(s, "offrir", true);
             proche.sendActionBar(Messages.mini("<gold>La lame se couche à l'horizontale, la poignée vers toi. <gray>(clic droit, puis reste près d'elle 3 s)"));
         }
         if (s.e instanceof Mob mob) IACombat.regarder(mob, proche.getLocation());
@@ -1257,6 +1321,7 @@ final class Bestiaire implements Listener {
         e.proposes.clear();
         e.refus = 0;
         s.e.getWorld().playSound(s.e.getLocation(), Sound.BLOCK_ANVIL_PLACE, 0.6f, 1.6f);
+        jouer(s, "se_rendre", false);
         if (source != null) source.sendMessage(Messages.mini("<gold>La Lame-orpheline se rend et te tend de nouveau sa poignée."));
         evenement(source, s, sp.invincible().evenement());
     }
@@ -1536,7 +1601,8 @@ final class Bestiaire implements Listener {
         float yaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
         s.e.teleport(new Location(l.getWorld(), nx, y, nz, yaw, 0));
         Modeles.Instance m = modele(s);
-        String an = s.d.animation("marche");
+        String an = s.d.animation("ronde");
+        if (an == null) an = a(m, "ronde") ? "ronde" : s.d.animation("marche");
         if (an == null) an = "marche";
         if (a(m, an) && !an.equals(m.animation())) m.jouerParDessus(an, true);
     }

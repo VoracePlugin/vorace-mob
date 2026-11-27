@@ -1,5 +1,17 @@
 # Journal des changements
 
+## 1.13.0 (étage 1 de Babel : musique de l'Os-violon, Glaneur qui suit, cycle à plusieurs groupes)
+
+- **Rôle d'animation `jeu`** : en combat, il remplace les boucles de garde et de déplacement (l'Os-violon joue sa
+  musique en se plaçant ; ses attaques et les coups reçus passent par-dessus).
+- **Glaneur** (`combat.sac`) : sans sac à ramasser, il se tient à 15-25 blocs du joueur qui se bat le plus proche (à 48
+  blocs), hors de sa vue si possible ; son cerveau ne l'emmène plus ailleurs pendant ce temps.
+- **Cycle raccourci** : quand plusieurs groupes de joueurs sont à 48 blocs d'un point d'apparition (deux joueurs à 12
+  blocs l'un de l'autre, de proche en proche, sont un groupe), son cycle et sa réapparition sont × (1 − 0,15 par groupe
+  en plus), 60 % au moins.
+- Animations des modèles de l'étage 1 : `offrir` et `se_rendre` (Lame-orpheline), `ouverture` (Porte-Fardeau, tête
+  découverte), `ronde` (Faucheuse fantôme).
+
 ## 1.12.0 (étage 1 de Babel : les comportements du bestiaire)
 
 - **Parties** (`parties:`) : l'os du modèle que le joueur vise prend le coup ; cordes de l'Os-violon (3 coups : plus

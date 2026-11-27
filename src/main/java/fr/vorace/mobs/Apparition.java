@@ -54,7 +54,45 @@ public record Apparition(String id, List<String> mobs, String monde, double x, d
      * Toujours faux sans cycle.
      */
     public boolean vagueDue(long maintenant, long debutManque) {
-        return cycle > 0 && debutManque > 0 && maintenant - debutManque >= cycle * 1000;
+        return vagueDue(maintenant, debutManque, 1);
+    }
+
+    /** Comme {@link #vagueDue(long, long)}, le cycle multiplié par {@code facteur} (plusieurs groupes de joueurs). */
+    public boolean vagueDue(long maintenant, long debutManque, double facteur) {
+        return cycle > 0 && debutManque > 0 && maintenant - debutManque >= cycle * 1000 * facteur;
+    }
+
+    /** Rayon (blocs) autour du point où l'on compte les groupes de joueurs ; distance qui lie deux joueurs d'un même groupe. */
+    public static final double RAYON_GROUPES = 48, LIEN_GROUPE = 12;
+
+    /**
+     * Groupes de joueurs parmi ces positions ({x, z}) : deux joueurs à {@link #LIEN_GROUPE} blocs ou moins l'un de l'autre
+     * (de proche en proche) sont du même groupe.
+     */
+    public static int groupes(List<double[]> positions) {
+        int n = positions.size(), g = 0;
+        boolean[] vu = new boolean[n];
+        for (int i = 0; i < n; i++) {
+            if (vu[i]) continue;
+            g++;
+            java.util.ArrayDeque<Integer> file = new java.util.ArrayDeque<>();
+            file.add(i);
+            vu[i] = true;
+            while (!file.isEmpty()) {
+                int k = file.poll();
+                for (int j = 0; j < n; j++) {
+                    if (vu[j]) continue;
+                    double dx = positions.get(k)[0] - positions.get(j)[0], dz = positions.get(k)[1] - positions.get(j)[1];
+                    if (dx * dx + dz * dz <= LIEN_GROUPE * LIEN_GROUPE) { vu[j] = true; file.add(j); }
+                }
+            }
+        }
+        return g;
+    }
+
+    /** Cycle × (1 − 0,15 par groupe en plus), 60 % au moins : un étage plein ne se vide pas. */
+    public static double facteurGroupes(int groupes) {
+        return Math.max(0.6, 1 - 0.15 * Math.max(0, groupes - 1));
     }
 
     /**

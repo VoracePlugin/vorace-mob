@@ -733,6 +733,11 @@ final class IACombat {
     /** Nom de l'animation d'un rôle de combat (garde, recul...) si le modèle l'a, sinon null. */
     private String anim(Mobs.Suivi s, Modeles.Instance m, String role) {
         if (m == null) return null;
+        // rôle « jeu » (l'Os-violon joue sa musique) : en combat, il remplace ses boucles de garde et de déplacement
+        if (s.ia != null && s.ia.engage && ROLES_JEU.contains(role)) {
+            String j = s.d.animation("jeu");
+            if (j != null && m.modele().animations().containsKey(j)) return j;
+        }
         String n = s.ia == null ? null : animDePhase(s.d.combat(), s.ia.phase, role);
         if (n != null && m.modele().animations().containsKey(n)) return n;
         n = s.d.animation(role);
@@ -742,7 +747,10 @@ final class IACombat {
 
     /** Rôles joués en boucle : leurs animations (du mob ou de ses phases) se remplacent l'une l'autre. */
     static final List<String> ROLES_BOUCLE = List.of("garde", "marche", "marche-combat", "course", "recul", "droite", "gauche",
-        "fuite", "assis");
+        "fuite", "assis", "jeu");
+
+    /** Rôles remplacés en combat par l'animation « jeu » du mob (musique de l'Os-violon). */
+    static final List<String> ROLES_JEU = List.of("garde", "marche-combat", "recul", "droite", "gauche");
 
     /** Vrai si {@code anim} est une boucle de ce mob : un rôle de {@link #ROLES_BOUCLE} dans ses animations ou ses phases. */
     static boolean boucleDuMob(Mobs.Suivi s, String anim) {

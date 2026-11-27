@@ -106,6 +106,8 @@ mouton:
   `contre-paroi`, `centre: lanterne`, `sacrifice`, `evenement-interrompu`, `evenement-ratee`. Entités de quête (racine du
   mob) : `invulnerable`, `regard`, `vu` (événement, repousse vers un point), `ronde` (blocs/s), `duree-de-vie`.
   Événement `VoraceMobEvenementEvent` (joueur, mob, clé) : le plugin des quêtes le compte.
+- **Plusieurs groupes de joueurs** autour d'un point d'apparition (48 blocs) : cycle et réapparition × (1 − 0,15 par
+  groupe en plus), 60 % au moins. Rôle d'animation `jeu` : joué en combat à la place des boucles de garde et de marche.
 - **Joueurs en créatif** : ils comptent comme les autres pour faire vivre les mobs et les effrayer (oiseaux,
   lapins...), mais ne sont jamais attaqués. Seuls les spectateurs et les joueurs invisibles sont ignorés.
 - **IA** : `ia: vorace` (le cerveau remplace l'IA de déplacement du jeu), `ia: jeu` (l'IA du jeu, gardée en laisse :
