@@ -422,6 +422,9 @@ final class Combats {
             + (c != null && c.getWorld().equals(s.e.getWorld()) ? String.format(Locale.ROOT, " cible=%.1f vue=%s", c.getLocation().distance(s.e.getLocation()),
                 s.e instanceof LivingEntity le && le.hasLineOfSight(c) ? "oui" : "non") : "");
         String groupe = s.ia != null && s.d.combat().suitLeGroupe() ? " joueurs=" + s.ia.joueurs() : "";
-        return String.format(Locale.ROOT, " niveau=%d vie=%.0f/%.0f rang=%s", s.niveau, s.vie, s.vieMax, s.d.combat().rang().nom()) + groupe + ia;
+        String meca = (s.ia != null && s.ia.munitions >= 0 ? " munitions=" + s.ia.munitions : "") + (s.sansButin ? " sans-butin=oui" : "")
+            + (s.rondeIndex >= 0 ? " ronde=" + s.rondeIndex : "") + (s.assis ? " assis=oui" : "")
+            + (s.d.combat().meca().fuite() != null ? " fuite=" + (s.arrive >= 0 ? "arrive" : s.fuiteVers != null ? "en-route" : "aucune") : "");
+        return String.format(Locale.ROOT, " niveau=%d vie=%.0f/%.0f rang=%s", s.niveau, s.vie, s.vieMax, s.d.combat().rang().nom()) + groupe + ia + meca;
     }
 }
