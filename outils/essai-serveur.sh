@@ -179,7 +179,11 @@ refuge: { monde: world, cercle: [1.5, -6.5, 4], sure: true }
 ZONE
 cmd "say ESSAI-ZS-1"
 cmd "vmob recharger"
-sleep 10
+# un coup qui repousse a pu le sortir de la zone avant qu'elle existe : on l'y remet
+cmd "tp Testeur 1.5 -60 -6.5"
+sleep 5
+cmd "tp Testeur 1.5 -60 -6.5"
+sleep 5
 cmd "vmob info cr_"
 sleep 1
 cmd "say ESSAI-ZS-2"
