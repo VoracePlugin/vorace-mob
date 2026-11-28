@@ -89,7 +89,11 @@ public final class VoraceMobAPI {
     /** Stat du mob de combat (« resistance », « puissance_phys »...), 0 si elle n'est pas écrite. */
     public static double stat(Entity e, String cle) {
         Mobs.Suivi s = combattant(e);
-        return s == null ? 0 : s.definition().combat().stat(cle, s.niveau);
+        if (s == null) return 0;
+        double v = s.definition().combat().stat(cle, s.niveau);
+        // ramolli par le feu (Cierge-errant, faiblesse.ramollit) : Défense physique ÷ 2
+        if (("resistance".equals(cle) || "armure".equals(cle)) && plugin.mobs().bestiaire().ramolli(s)) v *= 0.5;
+        return v;
     }
 
     /** Toutes les stats écrites du mob de combat (vide si ce n'en est pas un). */
@@ -123,6 +127,51 @@ public final class VoraceMobAPI {
     public static double infliger(Entity e, double montant, Entity source) {
         Mobs.Suivi s = combattant(e);
         return s == null ? -1 : plugin.mobs().combats().infliger(s, montant, source instanceof Player p ? p : null);
+    }
+
+    /**
+     * Comme {@link #infliger(Entity, double, Entity)}, en disant ce qu'est le coup : {@code type} de dégâts (« Fire »,
+     * « Water »...) et {@code nature} (« melee », « distance » ou « zone »). Le bestiaire s'en sert : faiblesses
+     * (Feu-follet aux tirs, Phalène aux zones, Cierge au Feu), Moulière figée par l'Eau ou la Glace, tirs déviés.
+     */
+    public static double infliger(Entity e, double montant, Entity source, String type, String nature) {
+        Mobs.Suivi s = combattant(e);
+        if (s == null) return -1;
+        Bestiaire.contexte(type, nature);
+        return plugin.mobs().combats().infliger(s, montant, source instanceof Player p ? p : null);
+    }
+
+    /**
+     * Le mob n'est vu que de ces joueurs (monstre de quête propre à un joueur et à son groupe) : son entité, sa barre de
+     * Vie et son modèle animé. Vrai si c'est fait.
+     */
+    public static boolean visiblePour(Entity e, java.util.Collection<Player> joueurs) {
+        Mobs m = mobs();
+        Mobs.Suivi s = m == null ? null : m.suivi(e);
+        if (s == null) return false;
+        java.util.Set<java.util.UUID> ids = new java.util.HashSet<>();
+        for (Player p : joueurs) ids.add(p.getUniqueId());
+        java.util.List<Entity> morceaux = new java.util.ArrayList<>();
+        morceaux.add(e);
+        morceaux.addAll(e.getPassengers());
+        for (Player o : org.bukkit.Bukkit.getOnlinePlayers()) {
+            if (ids.contains(o.getUniqueId())) continue;
+            for (Entity x : morceaux) o.hideEntity(plugin, x);
+        }
+        if (plugin.modeles() != null) {
+            fr.vorace.modeles.Modeles.Instance i = plugin.modeles().instance(e);
+            if (i != null) i.visiblePour(joueurs);
+        }
+        return true;
+    }
+
+    /**
+     * Fragments d'âme du joueur (Fauchage de la Faucheuse errante) : part de Vie maximale perdue, négative (−0,1 par
+     * fragment, 3 au plus), 0 sans fragment. Le plugin du combat l'applique à la Vie maximale.
+     */
+    public static double fragmentsAme(Player p) {
+        Mobs m = mobs();
+        return m == null || p == null ? 0 : m.bestiaire().fragments(p);
     }
 
     /** Nom affiché du mob (« Mèche-sourde »), ou null si ce n'est pas un mob de Vorace. */
@@ -206,6 +255,110 @@ public final class VoraceMobAPI {
         if (s == null) return false;
         plugin.mobs().combats().soigner(s, montant);
         return true;
+    }
+
+    /**
+     * Nombre de joueurs comptés dans le combat de ce mob ({@code vie-groupe}, {@code degats-groupe}) ; 0 si ce n'est pas
+     * un mob de combat.
+     */
+    public static int joueursDuCombat(Entity e) {
+        Mobs.Suivi s = combattant(e);
+        return s == null || s.ia == null ? 0 : s.ia.joueurs();
+    }
+
+    /**
+     * Impose le nombre de joueurs d'un combat (par exemple les joueurs entrés dans l'arène d'un boss) ; sa Vie maximale
+     * suit en gardant son pourcentage. 0 rend le comptage à vorace-mob (joueurs à 30 blocs à l'engagement, puis chaque
+     * nouveau joueur qui le frappe). Faux si ce n'est pas un mob de combat.
+     */
+    public static boolean imposerJoueurs(Entity e, int joueurs) {
+        Mobs.Suivi s = combattant(e);
+        if (s == null) return false;
+        plugin.mobs().ia().imposerJoueurs(s, joueurs);
+        return true;
+    }
+
+    /** Vrai si ses coups ne doivent jamais faire tomber un joueur ({@code combat.jamais-mortel} : pantins d'entraînement). */
+    public static boolean jamaisMortel(Entity e) {
+        Mobs.Suivi s = combattant(e);
+        return s != null && s.definition().combat().meca().jamaisMortel();
+    }
+
+    /** Vrai si la garde de face de ce mob a été brisée au moins une fois pendant ce combat (butin « si: garde_brisee »). */
+    public static boolean gardeBrisee(Entity e) {
+        Mobs.Suivi s = combattant(e);
+        return s != null && s.ia != null && s.ia.gardeBrisee;
+    }
+
+    /**
+     * Note une condition du butin {@code si:} pendant ce combat : {@code meche_eteinte}, {@code avant_appel},
+     * {@code trois_cordes_coupees}... Une condition {@code par_...} ({@code par_branche_coupee}, {@code par_piece_cassee})
+     * se compte : chaque note ajoute {@code fois} et la chance de la ligne est multipliée d'autant (1 au plus).
+     * {@code garde_brisee} est notée par vorace-mob. Faux si ce n'est pas un mob de combat.
+     */
+    public static boolean noterCondition(Entity e, String condition, int fois) {
+        Mobs.Suivi s = combattant(e);
+        if (s == null || s.ia == null) return false;
+        plugin.mobs().ia().noter(s, condition, fois);
+        return true;
+    }
+
+    /** Comme {@link #noterCondition(Entity, String, int)}, une fois. */
+    public static boolean noterCondition(Entity e, String condition) { return noterCondition(e, condition, 1); }
+
+    /** Nombre de fois qu'une condition du butin a été notée dans ce combat (0 sinon). */
+    public static int condition(Entity e, String condition) {
+        Mobs.Suivi s = combattant(e);
+        return s == null || s.ia == null || condition == null ? 0 : s.ia.conditions.getOrDefault(condition.toLowerCase(java.util.Locale.ROOT).trim(), 0);
+    }
+
+    /**
+     * Soins ou protection qu'un joueur apporte au combat contre ce mob (un soin sur un allié, un bouclier, des dégâts
+     * encaissés à la place d'un autre) : ils comptent comme des dégâts pour la part du butin des élites, élites ++ et boss
+     * (10 % des contributions au moins). Faux si ce n'est pas un mob de combat engagé.
+     */
+    public static boolean contribuer(Entity e, Player joueur, double montant) {
+        Mobs.Suivi s = combattant(e);
+        if (s == null || s.ia == null || !s.ia.engage) return false;
+        plugin.mobs().ia().contribuer(s, joueur, montant);
+        return true;
+    }
+
+    /** Munitions restantes de ce mob ({@code combat.munitions}) ; −1 s'il n'en a pas ou n'est pas en combat. */
+    public static int munitions(Entity e) {
+        Mobs.Suivi s = combattant(e);
+        return s == null || s.ia == null ? -1 : s.ia.munitions;
+    }
+
+    /** Lui retire des munitions (une branche coupée : un tir de moins). Faux s'il n'en a pas. */
+    public static boolean retirerMunitions(Entity e, int n) {
+        Mobs.Suivi s = combattant(e);
+        if (s == null || s.ia == null || s.ia.munitions < 0) return false;
+        s.ia.munitions = Math.max(0, s.ia.munitions - Math.max(0, n));
+        return true;
+    }
+
+    /** Vrai pour un mob relevé (tas d'os) : il ne donnera ni butin ni XP. */
+    public static boolean sansButin(Entity e) {
+        Mobs.Suivi s = combattant(e);
+        return s != null && s.sansButin;
+    }
+
+    /**
+     * Purification posée sur ce mob ({@code secondes}) : son aura ({@code combat.aura}, l'Os-violon) s'éteint le temps
+     * qu'elle dure. Faux si ce n'est pas un mob de combat.
+     */
+    public static boolean purifier(Entity e, double secondes) {
+        Mobs.Suivi s = combattant(e);
+        if (s == null) return false;
+        plugin.mobs().ia().purifier(s, Math.round(secondes * 1000));
+        return true;
+    }
+
+    /** Rang porté par un objet de butin tiré à un autre rang que sa base (« rare »), ou null. */
+    public static String rangObjet(org.bukkit.inventory.ItemStack o) {
+        if (o == null || !o.hasItemMeta()) return null;
+        return o.getItemMeta().getPersistentDataContainer().get(Butin.CLE_RANG, org.bukkit.persistence.PersistentDataType.STRING);
     }
 
     /** Le coup que ce mob porte en ce moment (pendant l'événement de dégâts de son coup), ou null. */

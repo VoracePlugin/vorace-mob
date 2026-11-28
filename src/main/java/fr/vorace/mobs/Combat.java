@@ -23,6 +23,8 @@ import java.util.Map;
  *   barre: true          # barre de vie au-dessus du mob, en combat
  *   nom-visible: false   # vrai : nom et niveau au-dessus du mob (par défaut, seulement sa barre de vie)
  *   stats: { resistance: 12, armure: 3, res_mag: 0, puissance_phys: 75, puissance_mag: 66, crit: 0.03, esquive: 0.02 }
+ *   vie-groupe: 0.7      # Vie × (1 + 0,7 × (joueurs − 1)) selon les joueurs verrouillés à l'engagement (0 : jamais)
+ *   degats-groupe: {1: 0.4, 2: 0.7}   # Puissance de ses coups × ce facteur selon les joueurs (absents : × 1)
  * </pre>
  *
  * @param niveauMin niveau le plus bas tiré à l'apparition
@@ -37,7 +39,23 @@ import java.util.Map;
 public record Combat(int niveauMin, int niveauMax, double vie, Rang rang, String type, boolean magique, boolean barre,
                      Map<String, Double> stats, int niveauBase, Map<String, Double> progression, double xp, IA ia,
                      Competence coupDeBase, List<Competence> competences, List<Lot> butin, List<Phase> phases, int enrage,
-                     boolean nomVisible) {
+                     boolean nomVisible, double vieGroupe, Map<Integer, Double> degatsGroupe, Mecaniques meca,
+                     List<LotSpecial> butinSpecial) {
+
+    /** Distance (blocs) à laquelle un joueur est verrouillé dans le combat d'un mob qui suit la taille du groupe. */
+    public static final double RAYON_GROUPE = 30;
+
+    /** Vrai si sa Vie ou ses dégâts suivent la taille du groupe ({@code vie-groupe} ou {@code degats-groupe}). */
+    public boolean suitLeGroupe() { return vieGroupe > 0 || !degatsGroupe.isEmpty(); }
+
+    /** Multiplicateur de Vie pour {@code joueurs} joueurs verrouillés : 1 + vie-groupe × (joueurs − 1). */
+    public double facteurVie(int joueurs) { return 1 + vieGroupe * (Math.max(1, joueurs) - 1); }
+
+    /** Multiplicateur de la Puissance de ses coups pour {@code joueurs} joueurs (1 si ce nombre n'est pas écrit). */
+    public double facteurDegats(int joueurs) {
+        Double f = degatsGroupe.get(Math.max(1, joueurs));
+        return f == null ? 1 : f;
+    }
 
     /** Valeurs reprises par les attaques qui ne les écrivent pas. */
     record Defauts(String type, boolean magique) {}
@@ -68,14 +86,32 @@ public record Combat(int niveauMin, int niveauMax, double vie, Rang rang, String
     public record Lot(String objet, double chance, int min, int max) {}
 
     /**
+     * Une ligne de {@code butin-special} : {@code chasseur} (pièce prélevable : elle ne tombe pas, elle revient au métier
+     * du Chasseur par {@link VoraceMobMortEvent#getPiecesPrelevables}), {@code si} (condition notée pendant le combat :
+     * {@code garde_brisee}, {@code meche_eteinte}... ; une condition {@code par_...} compte : chance × le nombre de fois,
+     * 1 au plus) ou {@code premierKill} (une seule fois par joueur et par mob).
+     */
+    public record LotSpecial(Lot lot, boolean chasseur, String si, boolean premierKill) {
+        /** Chance de la ligne pour {@code fois} occurrences de sa condition (0 si la condition n'est pas remplie). */
+        public double chance(int fois) {
+            if (si == null) return lot.chance();
+            if (fois <= 0) return 0;
+            return si.startsWith("par_") ? Math.min(1, lot.chance() * fois) : lot.chance();
+        }
+    }
+
+    /**
      * Phase d'un élite ++ ou d'un boss : sous {@code seuil} de Vie (0,6 = 60 %), elle commence une fois.
      *
      * @param invocation   mob invoqué autour de lui (ou null), {@code nombre} exemplaires
      * @param vitesse      multiplicateur de vitesse à partir de cette phase
      * @param annonce      texte montré aux joueurs du combat
      * @param animation    animation jouée au changement de phase
+     * @param animations   rôles d'animation remplacés à partir de cette phase ({@code animations: {garde: idle_a_pied,
+     *                     marche-combat: marche_a_pied}}) : son repos et sa marche changent avec la phase
      */
-    public record Phase(double seuil, String nom, String invocation, int nombre, double vitesse, String annonce, String animation) {}
+    public record Phase(double seuil, String nom, String invocation, int nombre, double vitesse, String annonce, String animation,
+                        Map<String, String> animations) {}
     /** Rangs des mobs, du plus faible au plus fort. */
     public enum Rang {
         NORMAL("normal", "<white>", ""),
@@ -240,17 +276,16 @@ public record Combat(int niveauMin, int niveauMax, double vie, Rang rang, String
         }
         List<Lot> butin = new ArrayList<>();
         for (Map<?, ?> m : s.getMapList("butin")) {
-            Object o = m.get("objet");
-            if (o == null) { problemes.add("mob " + id + " : ligne de butin sans « objet »"); continue; }
-            int a = 1, b = 1;
-            Object n = m.get("nombre");
-            try {
-                if (n instanceof List<?> l && !l.isEmpty()) { a = (int) Zone.num(l.get(0)); b = l.size() > 1 ? (int) Zone.num(l.get(1)) : a; }
-                else if (n != null) a = b = (int) Zone.num(n);
-            } catch (RuntimeException e) { problemes.add("mob " + id + " : butin « " + o + " » : nombre mal écrit"); }
-            double ch = 1;
-            try { if (m.get("chance") != null) ch = Zone.num(m.get("chance")); } catch (RuntimeException e) { problemes.add("mob " + id + " : butin « " + o + " » : chance mal écrite"); }
-            butin.add(new Lot(o.toString(), Math.max(0, Math.min(1, ch)), Math.max(0, a), Math.max(Math.max(0, a), b)));
+            Lot l = lot(id, m, problemes);
+            if (l != null) butin.add(l);
+        }
+        List<LotSpecial> special = new ArrayList<>();
+        for (Map<?, ?> m : s.getMapList("butin-special")) {
+            Lot l = lot(id, m, problemes);
+            if (l == null) continue;
+            Object si = m.get("si");
+            special.add(new LotSpecial(l, Boolean.parseBoolean(String.valueOf(m.get("chasseur"))),
+                si == null ? null : si.toString().toLowerCase(Locale.ROOT).trim(), Boolean.parseBoolean(String.valueOf(m.get("premier-kill")))));
         }
         List<Phase> phases = new ArrayList<>();
         for (Map<?, ?> m : s.getMapList("phases")) {
@@ -264,7 +299,7 @@ public record Combat(int niveauMin, int niveauMax, double vie, Rang rang, String
                 else if (inv != null) { mobInv = inv.toString(); nombre = 1; }
                 phases.add(new Phase(seuil, m.get("nom") == null ? null : m.get("nom").toString(), mobInv, nombre,
                     m.get("vitesse") == null ? 1 : Zone.num(m.get("vitesse")), m.get("annonce") == null ? null : m.get("annonce").toString(),
-                    m.get("animation") == null ? null : m.get("animation").toString()));
+                    m.get("animation") == null ? null : m.get("animation").toString(), rolesDePhase(m.get("animations"))));
             } catch (RuntimeException e) {
                 problemes.add("mob " + id + " : phase mal écrite (seuil: 0.6 attendu)");
             }
@@ -272,7 +307,57 @@ public record Combat(int niveauMin, int niveauMax, double vie, Rang rang, String
         phases.sort((x, y) -> Double.compare(y.seuil(), x.seuil()));
         return new Combat(nMin, nMax, vie, rang, type, magique, s.getBoolean("barre", true), Map.copyOf(stats),
             s.getInt("niveau-base", nMin), Map.copyOf(prog), Math.max(0, s.getDouble("xp", 0)), ia, base, List.copyOf(comps),
-            List.copyOf(butin), List.copyOf(phases), Math.max(0, s.getInt("enrage", 0)), s.getBoolean("nom-visible", false));
+            List.copyOf(butin), List.copyOf(phases), Math.max(0, s.getInt("enrage", 0)), s.getBoolean("nom-visible", false),
+            Math.max(0, s.getDouble("vie-groupe", 0)), degatsGroupe(id, s, problemes), Mecaniques.lire(id, s, problemes),
+            List.copyOf(special));
+    }
+
+    /** Une ligne de butin ({@code objet}, {@code chance}, {@code nombre}) ; null si elle n'a pas d'objet. */
+    static Lot lot(String id, Map<?, ?> m, List<String> problemes) {
+        Object o = m.get("objet");
+        if (o == null) { problemes.add("mob " + id + " : ligne de butin sans « objet »"); return null; }
+        int a = 1, b = 1;
+        Object n = m.get("nombre");
+        try {
+            if (n instanceof List<?> l && !l.isEmpty()) { a = (int) Zone.num(l.get(0)); b = l.size() > 1 ? (int) Zone.num(l.get(1)) : a; }
+            else if (n != null) a = b = (int) Zone.num(n);
+        } catch (RuntimeException e) { problemes.add("mob " + id + " : butin « " + o + " » : nombre mal écrit"); }
+        double ch = 1;
+        try { if (m.get("chance") != null) ch = Zone.num(m.get("chance")); } catch (RuntimeException e) { problemes.add("mob " + id + " : butin « " + o + " » : chance mal écrite"); }
+        return new Lot(o.toString(), Math.max(0, Math.min(1, ch)), Math.max(0, a), Math.max(Math.max(0, a), b));
+    }
+
+    /** {@code animations: {garde: idle_a_pied}} d'une phase : rôle → animation (vide si absent). */
+    static Map<String, String> rolesDePhase(Object o) {
+        if (o == null) return Map.of();
+        Map<String, String> r = new LinkedHashMap<>();
+        if (o instanceof Map<?, ?> m) {
+            for (Map.Entry<?, ?> x : m.entrySet()) if (x.getValue() != null) r.put(x.getKey().toString().toLowerCase(Locale.ROOT), x.getValue().toString().toLowerCase(Locale.ROOT));
+        } else if (o instanceof ConfigurationSection c) {
+            for (String k : c.getKeys(false)) if (c.getString(k) != null) r.put(k.toLowerCase(Locale.ROOT), c.getString(k).toLowerCase(Locale.ROOT));
+        }
+        return Map.copyOf(r);
+    }
+
+    /** {@code degats-groupe: {1: 0.4, 2: 0.7}} : nombre de joueurs → facteur de Puissance. */
+    static Map<Integer, Double> degatsGroupe(String id, ConfigurationSection s, List<String> problemes) {
+        ConfigurationSection g = s.getConfigurationSection("degats-groupe");
+        if (g == null) {
+            if (s.contains("degats-groupe")) problemes.add("mob " + id + " : degats-groupe mal écrit ({1: 0.4, 2: 0.7})");
+            return Map.of();
+        }
+        Map<Integer, Double> m = new java.util.TreeMap<>();
+        for (String k : g.getKeys(false)) {
+            try {
+                int n = Integer.parseInt(k.trim());
+                double f = g.getDouble(k, -1);
+                if (n < 1 || f <= 0) throw new NumberFormatException();
+                m.put(n, f);
+            } catch (NumberFormatException e) {
+                problemes.add("mob " + id + " : degats-groupe « " + k + " » mal écrit (joueurs: facteur, ex. 1: 0.4)");
+            }
+        }
+        return Map.copyOf(m);
     }
 
     /**

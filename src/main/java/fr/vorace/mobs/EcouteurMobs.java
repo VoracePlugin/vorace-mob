@@ -59,6 +59,7 @@ public final class EcouteurMobs implements Listener {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void degats(EntityDamageEvent e) {
         Mobs.Suivi s = plugin.mobs().suivi(e.getEntity());
+        if (s != null && !s.d.combattant() && s.d.quete().invulnerable()) { e.setCancelled(true); return; }   // entité de quête
         if (s != null && s.d.combattant()) plugin.mobs().combats().degatsDuJeu(e, s);
     }
 

@@ -20,6 +20,11 @@ public record CoupMob(double puissance, boolean magique, String type, double mul
         return new CoupMob(c.stat(c.magique() ? "puissance_mag" : "puissance_phys"), c.magique(), c.type(), 1, null, 0, "coup de base");
     }
 
+    /** Le même coup, multiplicateur × {@code f} (dégâts selon la taille du groupe). */
+    public CoupMob fois(double f) {
+        return f == 1 ? this : new CoupMob(puissance, magique, type, multiplicateur * f, alteration, duree, nom);
+    }
+
     /** Le coup d'une attaque, au niveau du mob ; {@code bonus} multiplie (enrage d'un boss). */
     public static CoupMob de(Combat c, int niveau, Competence a, double bonus) {
         return new CoupMob(c.stat(a.magique() ? "puissance_mag" : "puissance_phys", niveau), a.magique(), a.type(),

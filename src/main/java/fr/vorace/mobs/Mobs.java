@@ -49,10 +49,11 @@ import java.util.stream.Stream;
 public final class Mobs {
 
     private final VoraceMob plugin;
-    private final NamespacedKey cleMob, cleMaison, cleTroupeau, cleApparition, cleBesoins;
+    private final NamespacedKey cleMob, cleMaison, cleTroupeau, cleApparition, cleBesoins, cleSansButin;
     private Map<String, DefinitionMob> definitions = Map.of();
     private Map<String, Zone> zones = Map.of();
     private Map<String, Apparition> apparitions = Map.of();
+    private Rangs rangs = new Rangs();
     private final Map<UUID, Suivi> suivis = new LinkedHashMap<>();
     private final Map<String, EtatApparition> registre = new HashMap<>();
     private Map<String, List<Suivi>> troupeaux = new HashMap<>();
@@ -66,6 +67,8 @@ public final class Mobs {
     private final Combats combats;
     private final IACombat ia;
     private final Butin butin;
+    private final Comportements comportements;
+    private final Bestiaire bestiaire;
 
     /** Mobs suivis d'un point d'apparition (gardés dans donnees/apparitions.yml). */
     static final class EtatApparition {
@@ -75,6 +78,8 @@ public final class Mobs {
         boolean rempli;
         /** Cycle : instant où le premier mob a manqué (0 : rien ne manque). Pas sauvegardé : le cycle repart au redémarrage. */
         long debutManque;
+        /** Point caché ({@code cache}) : mobs de la vague due qui attendent qu'un joueur passe tout près. */
+        int attente;
     }
 
     public Mobs(VoraceMob plugin) {
@@ -84,9 +89,12 @@ public final class Mobs {
         cleTroupeau = NamespacedKey.fromString("vorace:mob_troupeau");
         cleApparition = NamespacedKey.fromString("vorace:mob_apparition");
         cleBesoins = NamespacedKey.fromString("vorace:mob_besoins");
+        cleSansButin = NamespacedKey.fromString("vorace:mob_sans_butin");
         combats = new Combats(plugin, this);
         ia = new IACombat(plugin, this);
         butin = new Butin(plugin);
+        comportements = new Comportements(plugin, this);
+        bestiaire = new Bestiaire(plugin, this);
     }
 
     /** Monté par un joueur ou un autre mob (les affichages de la barre de vie, passagers eux aussi, ne comptent pas). */
@@ -100,6 +108,9 @@ public final class Mobs {
     /** Cerveau de combat (menace, déplacements, attaques). */
     IACombat ia() { return ia; }
     Butin butin() { return butin; }
+    Comportements comportements() { return comportements; }
+    Bestiaire bestiaire() { return bestiaire; }
+    Rangs rangs() { return rangs; }
     /** Tics écoulés depuis le démarrage des mobs. */
     long tics() { return tic; }
 
@@ -186,11 +197,24 @@ public final class Mobs {
             if (plugin.modeles() != null) for (String m : d.modeles()) if (plugin.modeles().modele(m) == null) problemes.add("mob " + d.id() + " : modèle animé inconnu « " + m + " »");
             if (!d.decor() && type(d.type()) == null) problemes.add("mob " + d.id() + " : entité inconnue « " + d.type() + " »");
         }
+        Rangs rg = new Rangs();
+        Path dr = dossier().resolve("rangs");
+        if (Files.isDirectory(dr)) {
+            try (Stream<Path> f = Files.walk(dr)) {
+                for (Path p : f.filter(x -> x.toString().toLowerCase(Locale.ROOT).endsWith(".yml")).sorted().toList()) {
+                    rg.lire("rangs/" + p.getFileName(), YamlConfiguration.loadConfiguration(p.toFile()), problemes);
+                }
+            } catch (IOException e) {
+                problemes.add("rangs : lecture impossible (" + e.getMessage() + ")");
+            }
+        }
         definitions = defs;
         zones = zs;
         apparitions = apps;
+        rangs = rg;
         problemes.forEach(p -> plugin.getLogger().warning("Mobs : " + p));
-        plugin.getLogger().info(defs.size() + " mob(s), " + zs.size() + " zone(s), " + apps.size() + " point(s) d'apparition");
+        plugin.getLogger().info(defs.size() + " mob(s), " + zs.size() + " zone(s), " + apps.size() + " point(s) d'apparition"
+            + (rg.taille() > 0 ? ", " + rg.taille() + " objet(s) à rang tiré" : ""));
         lireRegistre();
         if (tache != null && Bukkit.isPrimaryThread()) {
             // rechargement : les mobs en jeu reprennent leur nouvelle définition
@@ -229,6 +253,7 @@ public final class Mobs {
         if (tache != null) tache.cancel();
         try { ia.vider(); } catch (Throwable ignore) { }
         try { combats.vider(); } catch (Throwable ignore) { }
+        try { bestiaire.vider(); } catch (Throwable ignore) { }
         for (Suivi s : suivis.values()) sauverBesoins(s);
         sauverRegistre();
     }
@@ -276,6 +301,16 @@ public final class Mobs {
         UUID etiquette;
         /** Barre de vie : dernières proportions posées (Vie, traîne) et hauteur au-dessus du mob. */
         float barreV = -1, barreT = -1, barreY;
+        /** Tic de son arrivée (chargement ou apparition), pour {@code duree-de-vie}. Relevé d'un tas d'os : ni butin ni XP. */
+        long ne;
+        boolean sansButin, assis;
+        /** Ronde : point visé, sens (aller-retour), arrêté jusqu'à ce tic. */
+        int rondeIndex = -1, rondeSens = 1;
+        long rondeArret;
+        /** Crâne qui court : endroit visé (tas d'os), cherché, tic d'arrivée (−1 : en route). */
+        Location fuiteVers;
+        boolean fuiteCherchee;
+        long arrive = -1;
 
         Suivi(Entity e, DefinitionMob d) {
             this.e = e;
@@ -350,6 +385,8 @@ public final class Mobs {
             if (d == null) continue;
             if (e instanceof LivingEntity le && le.isDead()) continue;
             Suivi s = new Suivi(e, d);
+            s.ne = tic;
+            s.sansButin = pdc.has(cleSansButin, PersistentDataType.BYTE);
             String[] m = pdc.getOrDefault(cleMaison, PersistentDataType.STRING, "").split(";");
             Location l = e.getLocation();
             s.mx = l.getX(); s.my = l.getY(); s.mz = l.getZ();
@@ -414,6 +451,19 @@ public final class Mobs {
         if (s != null && s.d.combattant()) {
             if (e instanceof LivingEntity le && le.isDead()) {
                 try { butin.mort(s, e.getLocation()); } catch (Throwable ex) { erreur("butin " + s.d.id(), ex); }
+                // a-la-mort : ce qui naît à sa place (le crâne qui court du Squelette-mosaïque)
+                Mecaniques.Invocation inv = s.d.combat().meca().aLaMort();
+                if (inv != null) {
+                    try { comportements.aLaMort(s, inv); } catch (Throwable ex) { erreur("a-la-mort " + s.d.id(), ex); }
+                }
+                Player tueur = le.getKiller();
+                UUID g = s.ia == null ? null : Butin.gagnant(s.ia.degats);
+                if (tueur == null && g != null) tueur = Bukkit.getPlayer(g);
+                try { bestiaire.mort(s, tueur); } catch (Throwable ex) { erreur("bestiaire " + s.d.id(), ex); }
+                Mecaniques.Eclair ec = s.d.combat().meca().eclairALaMort();
+                if (ec != null) {
+                    try { comportements.eclair(s, ec); } catch (Throwable ex) { erreur("eclair " + s.d.id(), ex); }
+                }
             }
             ia.mort(s);
             combats.mort(s);
@@ -511,7 +561,65 @@ public final class Mobs {
             pdc.set(combats.cle(), PersistentDataType.STRING, String.format(Locale.ROOT, "%.2f;%d", d.combat().vieAuNiveau(n), n));
         }
         charger(List.of(e));
+        Suivi nouveau = suivis.get(e.getUniqueId());
+        if (nouveau != null && !d.decor()) {
+            try { comportements.apparition(nouveau); } catch (Throwable ex) { erreur("apparition " + d.id(), ex); }
+            try { bestiaire.apparition(nouveau); } catch (Throwable ex) { erreur("bestiaire " + d.id(), ex); }
+        }
         return e;
+    }
+
+    /** Mob relevé (tas d'os) : ni butin ni XP, même après un redémarrage. */
+    void marquerSansButin(Suivi s) {
+        s.sansButin = true;
+        s.e.getPersistentDataContainer().set(cleSansButin, PersistentDataType.BYTE, (byte) 1);
+    }
+
+    /**
+     * L'endroit le plus proche à {@code rayon} blocs : un point d'intérêt {@code type} des zones (« tas_os »,
+     * « depot_de_cire »), sinon un des {@code blocs} du monde (noms du jeu). Null s'il n'y en a pas.
+     */
+    Location endroitProche(Location l, String type, double rayon, List<String> blocs) {
+        World w = l.getWorld();
+        Location best = null;
+        double d = rayon * rayon;
+        if (type != null) {
+            for (Zone z : zones.values()) {
+                if (!z.monde().equals(w.getName())) continue;
+                for (Zone.Point p : z.points()) {
+                    if (!p.type().equalsIgnoreCase(type)) continue;
+                    double e = (p.x() - l.getX()) * (p.x() - l.getX()) + (p.z() - l.getZ()) * (p.z() - l.getZ());
+                    if (e <= d) { d = e; best = new Location(w, p.x(), p.y(), p.z()); }
+                }
+            }
+            if (best != null) return best;
+        }
+        if (blocs == null || blocs.isEmpty()) return null;
+        Set<Material> mats = new HashSet<>();
+        for (String b : blocs) { Material m = Material.matchMaterial(b); if (m != null && m.isBlock()) mats.add(m); }
+        if (mats.isEmpty()) return null;
+        int r = (int) Math.ceil(rayon), bx = l.getBlockX(), by = l.getBlockY(), bz = l.getBlockZ();
+        for (int dx = -r; dx <= r; dx++) {
+            for (int dz = -r; dz <= r; dz++) {
+                double e = dx * dx + dz * dz;
+                if (e > d) continue;
+                for (int dy = -3; dy <= 3; dy++) {
+                    Block b = w.getBlockAt(bx + dx, by + dy, bz + dz);
+                    if (!mats.contains(b.getType())) continue;
+                    // le pied du tas : un sol libre juste à côté du bloc
+                    Location pied = null;
+                    for (int[] c : new int[][]{{0, 0}, {1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
+                        Location s = sol(w, b.getX() + c[0] + 0.5, b.getY() + 1, b.getZ() + c[1] + 0.5, false);
+                        if (s != null && Math.abs(s.getY() - l.getY()) <= 4) { pied = s; break; }
+                    }
+                    if (pied == null) continue;
+                    d = e;
+                    best = pied;
+                    break;
+                }
+            }
+        }
+        return best;
     }
 
     static EntityType type(String nom) {
@@ -540,8 +648,34 @@ public final class Mobs {
         return a.niveau() > 0 && s.d.combattant() && s.niveau != a.niveau();
     }
 
+    /** Groupes de points d'apparition : départ commun de leur cycle, et groupes dont la vague vient de partir. */
+    private final Map<String, Long> debutGroupe = new HashMap<>();
+    private final Set<String> vaguesDeGroupe = new HashSet<>();
+
+    /** Un point d'apparition par son identifiant, ou null. */
+    Apparition apparition(String id) { return id == null ? null : apparitions.get(id); }
+
+    private java.lang.reflect.Method salleOccupee;
+    private boolean donjonCherche;
+
+    /** Vrai si cette salle de boss de Matsuri Donjon (« passeur » ou « 1:passeur ») est occupée ; faux sans lui. */
+    private boolean salleOccupee(String salle) {
+        if (!donjonCherche) {
+            donjonCherche = true;
+            org.bukkit.plugin.Plugin d = Bukkit.getPluginManager().getPlugin("MatsuriDonjon");
+            try {
+                salleOccupee = d == null ? null : Class.forName("fr.matsuri.donjon.DonjonAPI", true, d.getClass().getClassLoader()).getMethod("salleOccupee", String.class);
+            } catch (ReflectiveOperationException | LinkageError e) {
+                salleOccupee = null;
+            }
+        }
+        if (salleOccupee == null) return false;
+        try { return Boolean.TRUE.equals(salleOccupee.invoke(null, salle)); } catch (ReflectiveOperationException | RuntimeException e) { return false; }
+    }
+
     private void verifierApparitions() {
         long maintenant = System.currentTimeMillis();
+        vaguesDeGroupe.clear();
         for (Apparition a : apparitions.values()) {
             World w = Bukkit.getWorld(a.monde());
             if (w == null || !w.isChunkLoaded((int) Math.floor(a.x()) >> 4, (int) Math.floor(a.z()) >> 4)) continue;
@@ -579,35 +713,130 @@ public final class Mobs {
             }
             int manque = a.nombre() - et.membres.size();
             if (manque <= 0) { et.rempli = true; et.debutManque = 0; continue; }
+            // plusieurs groupes de joueurs autour du point : les monstres reviennent plus vite (60 % du cycle au plus court)
+            List<double[]> autour = new ArrayList<>();
+            for (Player p : w.getPlayers()) {
+                if (p.getGameMode() == GameMode.SPECTATOR) continue;
+                Location pl = p.getLocation();
+                if (Geometrie.distance(pl.getX(), pl.getZ(), a.x(), a.z()) <= Apparition.RAYON_GROUPES) autour.add(new double[]{pl.getX(), pl.getZ()});
+            }
+            double facteur = Apparition.facteurGroupes(Apparition.groupes(autour));
+            if (a.cycle() > 0 && et.rempli && et.debutManque == 0) et.debutManque = maintenant;
+            // pause (Chapelle des cierges) : pas de vague pendant le combat du boss, ni sous les yeux d'un joueur ;
+            // jamais plus de « pause-max » secondes sans vague
+            if (et.rempli && (a.pauseSalle() != null || a.pauseJoueur() > 0)) {
+                long depuis = maintenant - (et.debutManque > 0 ? et.debutManque : et.derniereMort);
+                boolean proche = false;
+                if (a.pauseJoueur() > 0) {
+                    for (Player p : w.getPlayers()) {
+                        if (Geometrie.distance(p.getLocation().getX(), p.getLocation().getZ(), a.x(), a.z()) < a.pauseJoueur()) { proche = true; break; }
+                    }
+                }
+                if (a.enPause(a.pauseSalle() != null && salleOccupee(a.pauseSalle()), proche, depuis)) continue;
+            }
             int n;
             if (a.cycle() > 0 && et.rempli) {
-                // cycle : tous les mobs manquants reviennent ensemble, « cycle » secondes après la première mort
-                if (et.debutManque == 0) et.debutManque = maintenant;
-                if (!a.vagueDue(maintenant, et.debutManque)) continue;
+                // cycle : tous les mobs manquants reviennent ensemble, « cycle » secondes après la première mort ; les
+                // points d'un même « groupe » partagent ce départ (un groupe mêlé revient en une vague)
+                long debut = et.debutManque;
+                if (a.groupe() != null) debut = debutGroupe.merge(a.groupe(), et.debutManque, Math::min);
+                if (!a.vagueDue(maintenant, debut, facteur)) continue;
+                if (a.groupe() != null) vaguesDeGroupe.add(a.groupe());
                 n = manque;
             } else {
-                if (et.rempli && maintenant - et.derniereMort < a.reapparition() * 1000) continue;
+                if (et.rempli && maintenant - et.derniereMort < a.reapparition() * 1000 * facteur) continue;
                 n = et.rempli ? 1 : manque;
             }
-            int apparus = 0;
-            for (int k = 0; k < n; k++) {
-                String mob = a.mobs().get(hasard.nextInt(a.mobs().size()));
-                DefinitionMob dm = definition(mob);
-                // un mob de combat n'apparaît jamais dans une zone sûre
-                Location l = solAutour(w, a.x(), a.y(), a.z(), a.rayon(), dm != null && dm.combattant());
-                if (l == null) continue;
-                Entity e = invoquer(mob, l, a.id(), a.troupeau() ? a.id() : null, a.niveau());
-                if (e == null) continue;
-                et.membres.add(e.getUniqueId());
-                et.positions.put(e.getUniqueId(), new double[]{l.getX(), l.getY(), l.getZ()});
-                apparus++;
+            // monstre rare : une chance par tour ; raté, il faut attendre le tour suivant
+            if (a.chance() < 1 && hasard.nextDouble() >= a.chance()) {
+                if (a.cycle() > 0 && et.rempli) et.debutManque = maintenant;
+                else et.derniereMort = maintenant;
+                et.rempli = true;
+                continue;
             }
-            if (apparus == 0) continue;     // rien posé (zone sûre, mob inconnu) : prochain passage
-            et.debutManque = 0;
-            if (et.rempli) et.derniereMort = maintenant;
-            et.rempli = true;
-            registreModifie = true;
+            // embuscade : la vague attend, cachée, qu'un joueur passe tout près (révélée par reveillerCaches)
+            if (a.eveil() > 0) { et.attente = Math.max(et.attente, n); continue; }
+            if (poser(a, et, w, n, maintenant) == 0) continue;     // rien posé (zone sûre, mob inconnu) : prochain passage
         }
+        for (String g : vaguesDeGroupe) debutGroupe.remove(g);
+    }
+
+    /**
+     * Places sous le plafond des zones qui contiennent (x, z) ({@code plafond} : mobs de combat vivants au plus) ;
+     * {@link Integer#MAX_VALUE} sans plafond.
+     */
+    int placeSousPlafond(World w, double x, double z) {
+        int place = Integer.MAX_VALUE;
+        for (Zone zo : zones.values()) {
+            if (zo.plafond() <= 0 || !w.getName().equals(zo.monde()) || !zo.contient(x, z)) continue;
+            int vivants = 0;
+            for (Suivi s : suivis.values()) {
+                if (!s.d.combattant() || !s.e.isValid() || !s.e.getWorld().equals(w)) continue;
+                Location l = s.e.getLocation();
+                if (zo.contient(l.getX(), l.getZ())) vivants++;
+            }
+            place = Math.min(place, Math.max(0, zo.plafond() - vivants));
+        }
+        return place;
+    }
+
+    /** Pose {@code n} mobs du point ; renvoie le nombre posé (et note la vague s'il y en a). */
+    private int poser(Apparition a, EtatApparition et, World w, int n, long maintenant) {
+        int apparus = 0;
+        n = Math.min(n, placeSousPlafond(w, a.x(), a.z()));   // zone pleine (plafond) : la vague attend
+        for (int k = 0; k < n; k++) {
+            String mob = a.mobs().get(hasard.nextInt(a.mobs().size()));
+            DefinitionMob dm = definition(mob);
+            // un mob de combat n'apparaît jamais dans une zone sûre ; une sortie de paroi, jamais sous le nez d'un joueur
+            Location l = solAutour(w, a.x(), a.y(), a.z(), a.rayon(), dm != null && dm.combattant());
+            if (l != null && a.paroi() && joueurA(w, l, Apparition.DISTANCE_PAROI)) l = null;
+            if (l == null) continue;
+            Entity e = invoquer(mob, l, a.id(), a.troupeau() ? a.id() : null, a.niveau());
+            if (e == null) continue;
+            if (a.paroi()) {
+                Suivi su = suivis.get(e.getUniqueId());
+                if (su != null) { try { comportements.paroi(su); } catch (Throwable ex) { erreur("paroi " + a.id(), ex); } }
+            }
+            et.membres.add(e.getUniqueId());
+            et.positions.put(e.getUniqueId(), new double[]{l.getX(), l.getY(), l.getZ()});
+            apparus++;
+        }
+        if (apparus == 0) return 0;
+        et.debutManque = 0;
+        if (et.rempli) et.derniereMort = maintenant;
+        et.rempli = true;
+        registreModifie = true;
+        return apparus;
+    }
+
+    /** Toutes les 5 tics : les vagues cachées ({@code cache}) sortent quand un joueur passe à leur distance d'éveil. */
+    void reveillerCaches() {
+        for (Apparition a : apparitions.values()) {
+            if (a.eveil() <= 0) continue;
+            EtatApparition et = registre.get(a.id());
+            if (et == null || et.attente <= 0) continue;
+            World w = Bukkit.getWorld(a.monde());
+            if (w == null) continue;
+            Location centre = new Location(w, a.x(), a.y(), a.z());
+            boolean proche = false;
+            for (Player p : w.getPlayers()) {
+                if (p.getGameMode() == GameMode.SPECTATOR || p.getGameMode() == GameMode.CREATIVE) continue;
+                if (Math.abs(p.getLocation().getY() - a.y()) < 4 && Geometrie.distance(p.getLocation().getX(), p.getLocation().getZ(), a.x(), a.z()) <= a.eveil() + a.rayon()) { proche = true; break; }
+            }
+            if (!proche) continue;
+            int n = Math.min(et.attente, a.nombre() - et.membres.size());
+            et.attente = 0;
+            if (n > 0) poser(a, et, w, n, System.currentTimeMillis());
+            w.playSound(centre, org.bukkit.Sound.BLOCK_BONE_BLOCK_BREAK, 1f, 0.6f);
+        }
+    }
+
+    /** Vrai si un joueur (hors spectateur) est à moins de {@code r} blocs. */
+    private static boolean joueurA(World w, Location l, double r) {
+        for (Player p : w.getPlayers()) {
+            if (p.getGameMode() != GameMode.SPECTATOR && p.getLocation().distanceSquared(l) < r * r) return true;
+        }
+        return false;
     }
 
     /**
@@ -698,8 +927,13 @@ public final class Mobs {
             try { combats.tic(suivis.values(), tic); } catch (Throwable ex) { erreur("combat", ex); }
         }
         try { ia.ticProjectiles(); } catch (Throwable ex) { erreur("projectiles", ex); }
+        if (tic % 5 == 0) {
+            try { comportements.tic(new ArrayList<>(suivis.values())); } catch (Throwable ex) { erreur("comportements", ex); }
+            try { reveillerCaches(); } catch (Throwable ex) { erreur("caches", ex); }
+        }
+        try { bestiaire.tic(); } catch (Throwable ex) { erreur("bestiaire", ex); }
         for (Suivi s : new ArrayList<>(suivis.values())) {
-            if (s.ia == null || (!s.ia.engage && !s.ia.rentre)) continue;
+            if (s.ia == null || (!s.ia.engage && !s.ia.rentre) || comportements.gere(s) || bestiaire.gere(s)) continue;
             try { ia.tic(s); } catch (Throwable ex) { erreur("combat " + s.d.id(), ex); }
         }
         for (Suivi s : suivis.values()) {
@@ -805,6 +1039,9 @@ public final class Mobs {
         if (monte(e) || (e instanceof LivingEntity le && le.isLeashed())) return;
         // mob de combat : en combat (ou s'il voit un joueur), c'est le cerveau de combat qui le mène
         if (s.d.combattant() && ia.penser(s)) return;
+        // au calme : ronde, tertre, crâne qui court
+        if (s.d.combattant() && comportements.calme(s, mob)) return;
+        if (bestiaire.calme(s)) return;   // Glaneur qui suit un groupe ou va ramasser un sac
         double distMaison = Geometrie.distance(l.getX(), l.getZ(), s.mx, s.mz);
 
         if (s.d.ia().equals("jeu")) {
@@ -1084,7 +1321,7 @@ public final class Mobs {
                         if (s.d.combattant()) {
                             // le plugin du combat lit ce coup pendant l'événement de dégâts (Puissance, type...)
                             s.dernierCombat = System.currentTimeMillis();
-                            s.coupEnCours = CoupMob.deBase(s.d.combat());
+                            s.coupEnCours = CoupMob.deBase(s.d.combat()).fois(s.ia == null ? 1 : s.d.combat().facteurDegats(s.ia.joueurs()));
                             try { menace.damage(Math.max(1, s.d.degats()), mob); } finally { s.coupEnCours = null; }
                         } else {
                             menace.damage(s.d.degats(), mob);

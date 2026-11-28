@@ -111,6 +111,9 @@ final class Combats {
      * {@code source} : le joueur qui frappe (menace et butin), ou null.
      */
     double infliger(Mobs.Suivi s, double montant, Player source) {
+        if (source != null) mobs.bestiaire().frappe(s);   // la Porte-Fardeau sort de l'eau
+        if (!mobs.bestiaire().contourne()) montant = mobs.bestiaire().recu(s, montant, source);   // parties, faiblesses...
+        montant = mobs.ia().garde(s, montant, source);   // garde de face, point faible (bestiaire)
         s.compteTic = Bukkit.getCurrentTick();
         s.dernierCombat = System.currentTimeMillis();
         double reel = Math.min(s.vie, Math.max(0, montant));
@@ -124,13 +127,43 @@ final class Combats {
         }
         sauver(s);
         afficher(s);
+        if (s.vie > 0 && !mobs.bestiaire().contourne()) mobs.bestiaire().apresCoup(s, source);   // formes, Lame qui se rend
         if (!(s.e instanceof LivingEntity le)) return 0;
         double avant = le.getHealth();
         if (s.vie <= 0) return avant + 1;
         return Math.max(0.001, avant - Combat.santeDuJeu(s.vie, s.vieMax, SANTE));
     }
 
+    /**
+     * Vie maximale selon les joueurs du combat ({@code vie-groupe}) : Vie du niveau × (1 + k × (joueurs − 1)). Quand elle
+     * change, le mob garde le même pourcentage de Vie (et sa traîne). Au retour au calme, elle redevient celle d'un joueur.
+     */
+    void ajusterGroupe(Mobs.Suivi s) {
+        Combat c = s.d.combat();
+        if (c == null || s.ia == null) return;
+        double max = c.vieAuNiveau(s.niveau) * c.facteurVie(s.ia.joueurs());
+        if (Math.abs(max - s.vieMax) < 1e-6 || max <= 0) return;
+        double ratio = s.vieMax <= 0 ? 1 : s.vie / s.vieMax, ratioT = s.vieMax <= 0 ? 1 : s.vieTraine / s.vieMax;
+        s.vieMax = max;
+        s.vie = Math.max(0, Math.min(max, ratio * max));
+        s.vieTraine = Math.max(s.vie, Math.min(max, ratioT * max));
+        sauver(s);
+        if (s.e instanceof LivingEntity le && le.isValid() && s.vie > 0) le.setHealth(Combat.santeDuJeu(s.vie, s.vieMax, SANTE));
+        s.barreV = s.barreT = -1;
+        afficher(s);
+    }
+
     /** Rend de la Vie au mob (soins de ses alliés, retour au calme). */
+    /** Pose sa Vie à {@code vie} (mob relevé avec une part de sa Vie). */
+    void fixerVie(Mobs.Suivi s, double vie) {
+        if (s.vie <= 0) return;
+        s.vie = Math.max(1, Math.min(s.vieMax, vie));
+        s.vieTraine = s.vie;
+        sauver(s);
+        if (s.e instanceof LivingEntity le && le.isValid()) le.setHealth(Combat.santeDuJeu(s.vie, s.vieMax, SANTE));
+        afficher(s);
+    }
+
     void soigner(Mobs.Suivi s, double montant) {
         if (s.vie <= 0 || montant <= 0) return;
         s.vie = Math.min(s.vieMax, s.vie + montant);
@@ -151,6 +184,7 @@ final class Combats {
         if (e instanceof EntityDamageByEntityEvent ee) {
             if (ee.getDamager() instanceof Player p) source = p;
             else if (ee.getDamager() instanceof Projectile pr && pr.getShooter() instanceof Player p) source = p;
+            if (ee.getDamager() instanceof Projectile) Bestiaire.contexte(null, "distance");
         }
         double montant = e.getFinalDamage() * s.vieMax / SANTE;
         double jeu = infliger(s, montant, source);
@@ -391,6 +425,11 @@ final class Combats {
             s.ia.mode, s.ia.attaques) + " effets=" + IACombat.effetsPoses
             + (c != null && c.getWorld().equals(s.e.getWorld()) ? String.format(Locale.ROOT, " cible=%.1f vue=%s", c.getLocation().distance(s.e.getLocation()),
                 s.e instanceof LivingEntity le && le.hasLineOfSight(c) ? "oui" : "non") : "");
-        return String.format(Locale.ROOT, " niveau=%d vie=%.0f/%.0f rang=%s", s.niveau, s.vie, s.vieMax, s.d.combat().rang().nom()) + ia;
+        String groupe = s.ia != null && s.d.combat().suitLeGroupe() ? " joueurs=" + s.ia.joueurs() : "";
+        String meca = (s.ia != null && s.ia.munitions >= 0 ? " munitions=" + s.ia.munitions : "") + (s.sansButin ? " sans-butin=oui" : "")
+            + (s.rondeIndex >= 0 ? " ronde=" + s.rondeIndex : "") + (s.assis ? " assis=oui" : "")
+            + (s.d.combat().meca().fuite() != null ? " fuite=" + (s.arrive >= 0 ? "arrive" : s.fuiteVers != null ? "en-route" : "aucune") : "");
+        return String.format(Locale.ROOT, " niveau=%d vie=%.0f/%.0f rang=%s", s.niveau, s.vie, s.vieMax, s.d.combat().rang().nom()) + groupe + ia + meca
+            + (Bestiaire.actif == null ? "" : Bestiaire.actif.etatTexte(s));
     }
 }

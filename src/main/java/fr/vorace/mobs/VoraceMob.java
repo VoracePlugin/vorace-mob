@@ -86,6 +86,7 @@ public final class VoraceMob extends JavaPlugin {
             mobs = new Mobs(this);
             mobs.charger();
             Bukkit.getPluginManager().registerEvents(new EcouteurMobs(this), this);
+            Bukkit.getPluginManager().registerEvents(mobs.bestiaire(), this);
             mobs.demarrer();
         } catch (Throwable t) {
             mobs = null;

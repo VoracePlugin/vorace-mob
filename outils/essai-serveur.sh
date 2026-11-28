@@ -94,6 +94,24 @@ zoo_chevre: { type: goat, caractere: territorial, ia: jeu, laisse: 24 }
 zoo_pigeon: { type: bat, vol: oiseau, marche: 0.9, envol: 1, laisse: 20, silencieux: true }
 zoo_papillon: { type: bat, vol: papillon, envol: 1, laisse: 10, silencieux: true }
 ZOO
+# étage 1 de Babel (vorace-mob 1.9.0) : crâne qui court et relève, munitions et recharge au dépôt, sortie de paroi, ronde
+cat > plugins/VoraceMob/mobs/etage1.yml <<'E1'
+e9_mosaique: { type: husk, caractere: agressif, activite: toujours, silencieux: true, combat: { niveau: 1, vie: 300, ia: { aggro: 3 }, coup-de-base: false,
+  a-la-mort: { invocation: e9_crane, nombre: 1 } } }
+e9_crane: { type: silverfish, caractere: craintif, activite: toujours, silencieux: true, combat: { niveau: 1, vie: 10, ia: { aggro: 0 }, coup-de-base: false,
+  duree-de-vie: 600, fuite: { vers: tas_os, rayon: 10 }, si-arrive: { releve: e9_mosaique, vie: 0.5, delai: 20 } } }
+e9_tireur: { type: pillager, caractere: agressif, activite: toujours, silencieux: true, combat: { niveau: 1, vie: 5000, ia: { role: distance, aggro: 20, distance: [3, 12] },
+  coup-de-base: false, munitions: { nombre: 2, recharge: depot_essai, rayon: 20, blocs: [honeycomb_block] },
+  competences: { tir: { forme: projectile, portee: [1, 18], signal: 6, actif: 1, recuperation: 4, recharge: 20, multiplicateur: 0.05, munitions: 2 },
+    recharge: { forme: contact, portee: 0, signal: 40, actif: 1, recuperation: 0, recharge: 40, multiplicateur: 0, apres-munitions: 2 } } } }
+e9_paroi: { type: vindicator, caractere: agressif, activite: toujours, silencieux: true, combat: { niveau: 1, vie: 100, ia: { aggro: 2 }, coup-de-base: false } }
+e9_ronde: { type: vindicator, caractere: agressif, activite: toujours, silencieux: true, combat: { niveau: 1, vie: 100, ia: { aggro: 0 }, coup-de-base: false,
+  ronde: { points: [[-6, -14], [-6, -24]], arret: 20 } } }
+e9_essaim: { type: endermite, caractere: agressif, activite: toujours, silencieux: true, combat: { niveau: 1, vie: 100, ia: { aggro: 0 }, coup-de-base: false,
+  eteint-lumiere: { rayon: 6, niveaux: 4 }, faiblesse: { zone: 1.5 } } }
+e9_fantome: { type: zombie, ia: aucune, silencieux: true, invulnerable: true, ronde: { points: [[40.5, 40.5], [40.5, 52.5]], vitesse: 4, boucle: false },
+  regard: { angle: 120, portee: 12, portee-accroupi: 6 }, vu: { evenement: e9.vu } }
+E1
 echo "eula=true" > eula.txt
 cat > server.properties <<PROPS
 online-mode=false
@@ -115,7 +133,7 @@ attendre() { # attendre <motif> <fichier> <secondes>
   for _ in $(seq 1 "$3"); do grep -q "$1" "$2" 2>/dev/null && return 0; sleep 1; done; return 1
 }
 if ! attendre 'Done (' journal.txt 400; then echo "Le serveur n'a pas démarré"; tail -80 journal.txt; exit 1; fi
-node "$OUTILS/essai-bot.mjs" 150 $CLIENT > bot.txt 2>&1 &
+node "$OUTILS/essai-bot.mjs" 250 $CLIENT > bot.txt 2>&1 &
 BOT=$!
 attendre 'BOT CONNECTE' bot.txt 60 || { echo "Le faux joueur ne s'est pas connecté"; cat bot.txt; }
 sleep 2
@@ -157,26 +175,80 @@ cmd "vmob info cr_"
 sleep 5
 cmd "vmob info cr_"
 cmd "vmob menace 32"
-# zone sûre : le faux joueur est dans un cercle de 4 blocs (sure: true) ; les mobs de combat lâchent leur cible. Sans la
+# zone sûre : le faux joueur est dans un cercle de 8 blocs (un coup qui repousse ne l en sort pas) (sure: true) ; les mobs de combat lâchent leur cible. Sans la
 # zone, ils le reprennent pour cible (la preuve que c'est elle qui les arrête).
 mkdir -p plugins/VoraceMob/zones
 cat > plugins/VoraceMob/zones/refuge.yml <<'ZONE'
-refuge: { monde: world, cercle: [1.5, -6.5, 4], sure: true }
+refuge: { monde: world, cercle: [1.5, -6.5, 8], sure: true }
 ZONE
 cmd "say ESSAI-ZS-1"
 cmd "vmob recharger"
-sleep 10
+# un coup qui repousse a pu le sortir de la zone avant qu'elle existe : on l'y remet
+cmd "tp Testeur 1.5 -60 -6.5"
+sleep 5
+cmd "tp Testeur 1.5 -60 -6.5"
+sleep 5
 cmd "vmob info cr_"
 sleep 1
 cmd "say ESSAI-ZS-2"
 rm -f plugins/VoraceMob/zones/refuge.yml
 cmd "vmob recharger"
-# les mobs ont été chassés de la zone : le joueur va près d'eux pour qu'ils puissent le revoir
-cmd "tp Testeur 7 -60 3"
-sleep 10
+# les mobs ont été chassés de la zone et errent : le joueur va à côté de l'un d'eux pour qu'ils puissent le revoir
+cmd "execute at @e[type=husk,limit=1,sort=random] run tp Testeur ~3 ~ ~"
+sleep 4
+cmd "execute at @e[type=husk,limit=1,sort=random] run tp Testeur ~3 ~ ~"
+sleep 6
 cmd "vmob info cr_"
 sleep 1
 cmd "say ESSAI-ZS-3"
+# étage 1 de Babel (1.9.0)
+cmd "kill @e[type=husk]"
+cmd "tp Testeur 7 -60 3"
+cmd "effect give Testeur resistance 200 4 true"
+cmd "effect give Testeur regeneration 200 4 true"
+cmd "say ESSAI-E1-CRANE"
+cmd "setblock 16 -60 3 bone_block"
+cmd "vmob invoquer e9_mosaique"
+sleep 3
+cmd "tp @e[type=husk,limit=1] 12 -60 3"
+sleep 1
+cmd "kill @e[type=husk]"
+for k in 1 2 3 4 5 6; do sleep 2; cmd "vmob info e9_"; done
+cmd "say ESSAI-E1-MUNITIONS"
+cmd "kill @e[type=husk]"
+cmd "kill @e[type=silverfish]"
+cmd "setblock 7 -60 -8 honeycomb_block"
+cmd "vmob invoquer e9_tireur"
+for k in 1 2 3 4 5 6 7 8 9 10 11 12; do sleep 2; cmd "vmob info e9_tireur"; done
+cmd "say ESSAI-E1-PAROI"
+cmd "kill @e[type=pillager]"
+cmd "fill 22 -60 -1 22 -56 7 stone"
+mkdir -p plugins/VoraceMob/apparitions
+cat > plugins/VoraceMob/apparitions/etage1.yml <<'APP'
+e9_point_paroi: { mob: e9_paroi, monde: world, centre: [19.5, -60, 3.5], rayon: 1, nombre: 1, reapparition: 5, apparition: paroi }
+APP
+cmd "vmob recharger"
+cmd "vmob invoquer e9_ronde"
+# relevé chaque seconde : le mob de la paroi n'y reste collé que le temps que la fissure s'ouvre
+for k in $(seq 1 16); do sleep 1; cmd "vmob info e9_"; done
+# bestiaire (1.12.0) : l'essaim baisse les torches (torche d'âme) et les rallume en partant ; l'entité de quête est
+# invulnérable et fait sa ronde
+cmd "say ESSAI-E1-BESTIAIRE"
+cmd "setblock 30 -60 30 torch"
+cmd "vmob invoquer e9_essaim"
+cmd "vmob invoquer e9_fantome"
+sleep 1
+cmd "tp @e[type=endermite,limit=1] 30 -60 32"
+cmd "tp @e[type=zombie,limit=1] 40.5 -60 40.5"
+cmd "tp Testeur 30 -60 40"
+sleep 3
+cmd "execute if block 30 -60 30 minecraft:soul_torch run say ETEINT-OUI"
+cmd "damage @e[type=zombie,limit=1] 50 minecraft:generic"
+cmd "kill @e[type=endermite]"
+sleep 3
+cmd "execute if block 30 -60 30 minecraft:torch run say RALLUME-OUI"
+cmd "vmob info e9_fantome Testeur"
+cmd "say ESSAI-E1-FIN"
 wait $BOT
 sleep 1
 cmd "stop"
@@ -231,5 +303,32 @@ for m in mouton vache cochon cheval poule chat lapin renard cerf sanglier ecureu
   awk -v p="${D:-0}" 'BEGIN {exit !(p > 1.0)}' || ZOO_KO=1
 done
 [ $ZOO_KO = 0 ] || { echo "ECHEC : une sorte de mob ne bouge pas toute seule en 45 s"; exit 1; }
-if grep -ao 'maison=[0-9.]*/[0-9]*' journal.txt | awk -F'[=/]' '$2 > $3 + 2 {bad=1} END {exit !bad}'; then echo "ECHEC : un mob est sorti de sa laisse"; exit 1; fi
+# (les mobs déplacés à la main par l'essai — tp — ne comptent pas : essaim et entité de quête du bestiaire)
+if grep -a 'maison=' journal.txt | grep -av 'mob=e9_fantome\|mob=e9_essaim' | grep -ao 'maison=[0-9.]*/[0-9]*' | awk -F'[=/]' '$2 > $3 + 2 {bad=1} END {exit !bad}'; then echo "ECHEC : un mob est sorti de sa laisse"; exit 1; fi
+echo "===== Étage 1 de Babel (1.9.0)"
+CRANE=$(phase 'ESSAI-E1-CRANE' 'ESSAI-E1-MUNITIONS' | grep -a 'mob=e9_')
+MUNI=$(phase 'ESSAI-E1-MUNITIONS' 'ESSAI-E1-PAROI' | grep -a 'mob=e9_tireur')
+PAROI=$(phase 'ESSAI-E1-PAROI' 'ESSAI-E1-BESTIAIRE' | grep -a 'mob=e9_')
+BEST=$(phase 'ESSAI-E1-BESTIAIRE' 'ESSAI-E1-FIN')
+echo "crâne qui court :"; echo "$CRANE"
+echo "munitions :"; echo "$MUNI" | grep -ao 'mode=[a-z]* .*munitions=[0-9]*' | sed 's/ effets=.*munitions=/ munitions=/'
+echo "paroi et ronde :"; echo "$PAROI" | grep -ao 'mob=e9_[a-z]* .*pos=[-0-9.,]*\|ronde=[0-9]*' | head -20
+echo "$CRANE" | grep -aq 'mob=e9_crane' || { echo "ECHEC : la Mosaïque tuée ne fait pas naître de crâne"; exit 1; }
+echo "$CRANE" | grep -aqE 'mob=e9_crane .*fuite=(en-route|arrive)' || { echo "ECHEC : le crâne ne trouve pas le bloc d'os"; exit 1; }
+echo "$CRANE" | grep -aq 'mob=e9_mosaique .*sans-butin=oui' || { echo "ECHEC : le crâne ne relève pas la Mosaïque (sans butin)"; exit 1; }
+echo "$MUNI" | grep -aq 'munitions=0' || { echo "ECHEC : le tireur n'use pas ses munitions"; exit 1; }
+# rechargé : on le voit avec des munitions après 0, ou il tire encore après 0 (sans munitions, le tir ne part pas ;
+# recharge + 2 tirs tiennent entre deux /vmob info)
+echo "$MUNI" | awk '{match($0, /attaques=[0-9]+/); a = substr($0, RSTART + 9, RLENGTH - 9) + 0}
+  /munitions=0/ && !z {z = 1; a0 = a} z && /munitions=[1-9]/ {ok = 1} z && a >= a0 + 3 {ok = 1} END {exit !ok}' \
+  || { echo "ECHEC : le tireur ne recharge pas"; exit 1; }
+echo "$MUNI" | grep -aq 'mode=depot' || { echo "ECHEC : le tireur ne marche pas au dépôt"; exit 1; }
+echo "$PAROI" | grep -aq 'mob=e9_paroi' || { echo "ECHEC : rien ne sort de la paroi"; exit 1; }
+echo "$PAROI" | grep -ao 'mob=e9_paroi .*pos=[-0-9.]*' | grep -aqE 'pos=21\.' || { echo "ECHEC : le mob de la paroi n'est pas collé à la paroi (x = 21,5)"; exit 1; }
+[ "$(echo "$PAROI" | grep -ao 'mob=e9_ronde .*ronde=[0-9]*' | grep -ao 'ronde=[0-9]*' | sort -u | wc -l)" -ge 2 ] || { echo "ECHEC : la ronde ne passe pas d'un point à l'autre"; exit 1; }
+echo "bestiaire :"; echo "$BEST" | grep -a 'OUI\|mob=e9_fantome' | head -5
+echo "$BEST" | grep -a 'ETEINT-OUI' | grep -avq 'execute' || { echo "ECHEC : l'essaim n'a pas baissé la torche"; exit 1; }
+echo "$BEST" | grep -a 'RALLUME-OUI' | grep -avq 'execute' || { echo "ECHEC : la torche n'est pas rallumée après l'essaim"; exit 1; }
+echo "$BEST" | grep -aq 'mob=e9_fantome' || { echo "ECHEC : l'entité de quête invulnérable est morte"; exit 1; }
+echo "$BEST" | grep -ao 'mob=e9_fantome .*pos=[-0-9.,]*' | grep -aqE 'pos=40\.[0-9]+,-?[0-9.]+,(4[4-9]|5[0-2])\.' || { echo "ECHEC : l'entité de quête ne fait pas sa ronde"; exit 1; }
 echo "ESSAI REUSSI"

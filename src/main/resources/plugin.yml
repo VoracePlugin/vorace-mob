@@ -6,6 +6,7 @@ description: Mobs avec un cerveau (besoins, troupeaux, laisse, zones, apparition
 authors: [ORA-KUN]
 website: https://github.com/VoracePlugin/vorace-mob
 depend: [Vorace]
+softdepend: [VoraceItem]
 commands:
   vmob:
     description: Mobs de vorace-mob

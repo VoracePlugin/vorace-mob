@@ -1,5 +1,152 @@
 # Journal des changements
 
+## 1.13.0 (étage 1 de Babel : musique de l'Os-violon, Glaneur qui suit, cycle à plusieurs groupes)
+
+- **Rôle d'animation `jeu`** : en combat, il remplace les boucles de garde et de déplacement (l'Os-violon joue sa
+  musique en se plaçant ; ses attaques et les coups reçus passent par-dessus).
+- **Glaneur** (`combat.sac`) : sans sac à ramasser, il se tient à 15-25 blocs du joueur qui se bat le plus proche (à 48
+  blocs), hors de sa vue si possible ; son cerveau ne l'emmène plus ailleurs pendant ce temps.
+- **Cycle raccourci** : quand plusieurs groupes de joueurs sont à 48 blocs d'un point d'apparition (deux joueurs à 12
+  blocs l'un de l'autre, de proche en proche, sont un groupe), son cycle et sa réapparition sont × (1 − 0,15 par groupe
+  en plus), 60 % au moins.
+- Animations des modèles de l'étage 1 : `offrir` et `se_rendre` (Lame-orpheline), `ouverture` (Porte-Fardeau, tête
+  découverte), `ronde` (Faucheuse fantôme).
+
+## 1.12.0 (étage 1 de Babel : les comportements du bestiaire)
+
+- **Parties** (`parties:`) : l'os du modèle que le joueur vise prend le coup ; cordes de l'Os-violon (3 coups : plus
+  d'aura), branches de la Mèche-sourde (3 coups : une bougie de moins, animation `branche_coupee_*`), cuve de la
+  Moulière (× 1,5) ; conditions de butin notées (`trois_cordes_coupees`, `par_branche_coupee`).
+- **Coups reçus** : `faiblesse` (Feu-follet × 2,5 aux tirs, Phalène × 1,5 aux zones, Cierge × 1,5 au Feu et ramolli :
+  Défense ÷ 2 5 s), `figee-par` (Moulière figée par l'Eau ou la Glace), mèche du Cierge de dos (`point-faible.partie`,
+  `e1.meche_eteinte`), tête de la Porte-Fardeau × 2 après ses attaques (`ouverture`), coups trop hauts sur le Squelette
+  rampant (`hitbox-basse`), tirs déviés par la Danse-parade (`immunite-projectiles`).
+- **Comportements** : lueur d'âme (`lueur`), phalènes qui baissent les torches et lanternes (`eteint-lumiere`), goule qui
+  mange les corps (`manger`, `VoraceMobActionEvent` « manger »), Sauteur aveugle (`perception: mouvement`) et son sceau
+  recollé de dos (`sceau`, `e1.sceau_recolle`), Attentive (`regard` : intangible quand personne ne la regarde, aveugle
+  qui la fixe 4 s), Faucheuse (`vision`), Mèche qui vise la lumière (`cible: lumiere`), Feu-follet qui fuit vers un
+  cul-de-sac puis appelle (`appel`, condition `avant_appel`), Lame-orpheline qui tend sa poignée (`offrande`) et se rend
+  à 1 de Vie (`invincible`), ballot de la Porte-Fardeau (`leurre`, `e1.ballot_ramasse`), Glaneur qui ramasse les objets
+  perdus à la mort d'un joueur (`sac` : rendus s'il meurt, troc `e1.troc_glaneur`), Squelette lancier qui tourne
+  lentement (`rotation`), âme enragée qui explose en fin de vie (`fin-de-vie`) et en frappant (`sacrifice`).
+- **Passeur** : tête-lanterne (partie détachée qui tourne au-dessus de lui, 6 % de sa Vie : détruite, il frappe au hasard
+  et prend +20 % 6 s, elle revient 20 s plus tard), lanterne posée en phase 3 (le corps ne prend plus que 20 % ; la
+  lanterne fêlée l'achève), charge contre une paroi (`contre-paroi` : étourdi 3 s), garde centrée sur la lanterne.
+- **Armure veuve** : `formes` et `recomposition` (3 s entre deux formes ; 8 % de la forme suivante en dégâts cassent une
+  pièce : −25 % de Vie, −10 % de dégâts, condition `par_piece_cassee`).
+- **Attaques** : `colle`, `trajectoire: droite`, `sautable`, `cibles-min`, `apres-jeu`, `branches`, `si`,
+  `seulement-hors-regard`, `fragment-d-ame` (Fauchage : −10 % de Vie max 5 min, `VoraceMobAPI.fragmentsAme`),
+  `evenement-interrompu` (`e1.mouliere_interrompue`), `evenement-ratee` (`e1.goule_punie`).
+- **Entités de quête** (tête-lanterne, Faucheuse fantôme) : `invulnerable`, `regard` (cône, accroupi, lanterne en main),
+  `vu` (événement `e1.faucheuse_vu`, `e1.tete_lanterne_vu`, repousse vers le Fil), `ronde` (blocs/s), `duree-de-vie`.
+- **Rôles d'animation** `touche` et `mort` : joués par les réactions automatiques du modèle.
+- **API** : `VoraceMobEvenementEvent` (joueur, mob, clé) ; `infliger(entite, montant, source, type, nature)` ;
+  `visiblePour(entite, joueurs)` ; `fragmentsAme(joueur)`. Défense ÷ 2 dans `stat` quand le mob est ramolli.
+- Correction : un mob avec `fuite` mais sans `si-arrive` (Feu-follet) n'est plus mené comme le crâne qui court (il ne
+  disparaissait plus en arrivant au bout de sa fuite, il se bat).
+- **Plafond des zones** (`plafond: 45` d'une zone) : au-delà de ce nombre de mobs de combat vivants dans la zone, les
+  points d'apparition attendent.
+- Essai serveur : l'essaim baisse une torche puis la rallume, l'entité de quête est invulnérable et fait sa ronde.
+
+## 1.11.0 (étage 1 de Babel : embuscades, invocations, soins d'allié, aura, neutres)
+
+- **Un seul butin par mob** (choix d'Antoine) : le butin par membre à 10 % de la 1.9.0 est retiré, il dupliquait le
+  butin des élites et des boss dans un groupe. Le gagnant seul tire la table ; `getButinDesMembres()` reste, vide.
+- **Embuscade** (`cache: { eveil: 3 }` d'un point d'apparition) : la vague due attend, cachée, qu'un joueur passe à 3
+  blocs du point (en plus de son rayon), puis sort d'un coup avec son animation d'apparition (dépôts d'ossements et leurs
+  Squelettes rampants). Vérifié toutes les 5 tics.
+- **Neutre** (`neutre: true` du mob) : il n'attaque que si on le frappe (Glaneur, Lame-orpheline).
+- **Attaques, en plus** :
+  - `invocation: { mob, nombre, max, total }` : au coup, ces mobs naissent autour de lui et prennent sa cible ; `max`
+    vivants à la fois, `total` sur tout le combat (âmes enragées de la lanterne du Passeur : 3, 6, 24) ;
+  - `phase-max: 1` : seulement jusqu'à cette phase ;
+  - `soin-allie: { cible, seuil, soin }` : la Refonte de la Moulière soigne un allié de la famille `cire` sous 30 % de Vie,
+    de 40 % ; elle ne part que s'il y en a un ;
+  - `interrompu-par: 2` : 2 coups reçus pendant le signal l'interrompent (condition `interrompu_<attaque>` notée).
+- **Mécaniques** : `famille: cire` ; `eclair-a-la-mort: { rayon, aveuglement }` (l'essaim de phalènes aveugle en mourant) ;
+  `aura: { rayon, degats, purification }` (l'Os-violon : les mobs à 10 blocs frappent × 1,2 ; une Purification l'éteint,
+  `VoraceMobAPI.purifier(entite, secondes)`, appelée par Matsuri Cœur 0.44.1).
+
+## 1.10.0 (rang porté par les objets de butin)
+
+- Fichiers `rangs/*.yml` : pour un objet de Vorace, son rang de base et son spectre (`objets: { e1_crane_fele: { base:
+  peu_commun, spectre: { commun: 20, peu_commun: 70, rare: 10 } } }`). Chaque exemplaire tombé tire son rang ; s'il n'est
+  pas au rang de base, il porte `vorace:rang` et `vorace:rang_base` (lus par Matsuri Économie 0.4.0 : × 2 par rang
+  au-dessus, × 0,5 en dessous), son nom prend la couleur du rang et sa description le nom du rang (« Rare » au lieu de
+  « Peu commune »). Au rang de base, rien ne change (il s'empile avec les autres). `VoraceMobAPI.rangObjet(objet)`.
+
+## 1.9.0 (étage 1 de Babel : butin spécial, butin de groupe, crâne qui court, munitions, ronde, paroi)
+
+- **Butin spécial** (`combat.butin-special`) :
+  - `chasseur: true` : pièce prélevable du Chasseur ; elle ne tombe pas, elle est rendue dans
+    `VoraceMobMortEvent.getPiecesPrelevables()` (joueur → objets) pour le plugin des métiers ;
+  - `si: <condition>` : seulement si la condition a été notée pendant le combat (`garde_brisee` est notée par vorace-mob,
+    les autres par `VoraceMobAPI.noterCondition(entite, condition)`) ; `si: par_...` se compte : chance × le nombre de
+    fois, 1 au plus ;
+  - `premier-kill: true` : une fois par joueur et par mob (`donnees/premiers-kills.yml`).
+- **Butin de groupe** : élites, élites ++, mini-boss et boss : chaque membre du combat qui a fait au moins 10 % des
+  contributions (dégâts, plus les soins et protections notés par `VoraceMobAPI.contribuer(entite, joueur, montant)`)
+  tire sa table, réservée à lui (`VoraceMobMortEvent.getButinDesMembres()`). Monstres normaux : le gagnant seul.
+- **Second coup** (`second-coup: { tic, forme, angle, rayon, multiplicateur }` d'une attaque) : le Double coup de massue
+  du Squelette-mosaïque frappe deux fois.
+- **Munitions** (`combat.munitions: { nombre, recharge, rayon, blocs }`, attaques `munitions:` et `apres-munitions:`) :
+  la Mèche-sourde tire 3 fois, puis marche au dépôt de cire le plus proche (point de zone `depot_de_cire`, sinon bloc
+  de rayon de miel à 12 blocs ; sur place sans dépôt) et recharge. `VoraceMobAPI.munitions`, `retirerMunitions` (une
+  branche coupée).
+- **Crâne qui court** : `a-la-mort` part de l'os `depart` du modèle, `delai` tics après la mort (le crâne saute de la
+  Mosaïque) ; `duree-de-vie` (il disparaît sans butin), `fuite: { vers: tas_os, rayon: 8 }` (point de zone, sinon bloc
+  d'os), `si-arrive: { releve, vie, delai }` : arrivé, le squelette se relève là avec 50 % de sa Vie, sans butin ni XP
+  (`VoraceMobMortEvent.isSansButin()`, `VoraceMobAPI.sansButin`).
+- **Tertre** (`combat.tertre: { assis, regen, attente, lever }`) : le Gardien est assis au calme (animation `assis`), se
+  lève à l'engagement (`se-lever`), ne récupère pas toute sa Vie en rentrant : 1 % par seconde après 10 s de calme.
+- **Ronde** (`ronde:` d'un point d'apparition ou de `combat:`) : aller-retour de point en point au calme, arrêt aux deux
+  bouts (`arret` en tics) ; sa maison suit (la laisse part du dernier point de sa ronde). Animation `marche` du mob.
+- **Sortie de paroi** (`apparition: paroi` d'un point) : le mob sort de la paroi la plus proche (fissure lumineuse de
+  30 tics, figé pendant ce temps), jamais à moins de 8 blocs d'un joueur.
+- **Animation d'apparition** : le rôle `apparition` des animations du mob est joué à chaque apparition.
+- **Phases** : `animations: { garde: idle_a_pied, marche-combat: marche_a_pied }` dans une phase change son repos et sa
+  marche à partir de là (le Passeur à pied, puis gardant sa lanterne).
+- Animations en boucle propres au mob (rôles `marche`, `garde`... de ses animations ou de ses phases) : elles se
+  remplacent l'une l'autre ; avant, une boucle au nom propre au mob restait jouée.
+- `/vmob info` : munitions, conditions notées, mob relevé.
+
+## 1.8.0 (étage 1 de Babel : mécaniques du bestiaire et points d'apparition)
+
+- **Mécaniques des monstres** (bloc `combat:`) :
+  - `a-la-mort: { invocation: e1_crane_qui_court, nombre: 1 }` : à sa mort, ces mobs naissent à sa place (même niveau,
+    sans point d'apparition) ;
+  - `garde: { reduction, angle, brise-apres, ouverture, animation }` : un coup reçu de face (dans l'angle) perd
+    `reduction` de ses dégâts (son de bouclier) ; après `brise-apres` coups gardés, la garde se brise : `ouverture` tics
+    sans garde et figé, son animation jouée. `VoraceMobAPI.gardeBrisee(entite)` (butin « si: garde_brisee » plus tard) ;
+  - `point-faible: { dos, multiplicateur, fige }` : frappé dans le dos (à plus de 120° de son regard), dégâts ×
+    `multiplicateur` et figé `fige` tics ;
+  - `jamais-mortel: true` (pantins d'Orario) : `VoraceMobAPI.jamaisMortel(entite)`, pour le plugin du combat.
+- **Points d'apparition** :
+  - `chance: 0.35` : monstre rare, une chance par tour (raté : on attend le tour suivant) ;
+  - `groupe: gl02` : les points du même groupe partagent le départ de leur cycle (un groupe mêlé revient en une vague) ;
+  - `xp-multiplicateur: 1.5` et `butin-bonus: { objet, nombre }` : XP et un objet en plus pour les mobs de ce point ;
+  - `pause-si-salle: passeur` (salle de Matsuri Donjon occupée), `pause-si-joueur: 24` (un joueur à 24 blocs : rien
+    n'apparaît sous ses yeux), `pause-max: 1200` (jamais plus de 1 200 s sans vague) ;
+  - `entraide: 0` : distance d'entraide des mobs de ce point (0 : on les prend un par un).
+- Pas encore lus : apparition par une paroi, ronde de la Faucheuse, munitions de la Mèche-sourde, `butin-special`,
+  `releve`, `second-coup`, `hors-donjon` et les autres clés « à apprendre » du bestiaire.
+
+## 1.7.0 (étage 1 de Babel : taille du groupe et butin de vorace-item)
+
+- **Vie et dégâts selon la taille du groupe** (élites, élites ++, boss) : `vie-groupe: k` et `degats-groupe: {1: 0.4,
+  2: 0.7}` dans `combat:`. À l'engagement, le joueur qui l'engage et les joueurs à 30 blocs sont comptés ; chaque
+  nouveau joueur qui le frappe s'ajoute. Vie maximale = Vie × (1 + k × (joueurs − 1)), au même pourcentage si elle
+  monte en plein combat ; la barre de boss suit. Puissance de ses coups (coup de base, attaques, flaques) × le facteur
+  du nombre de joueurs (× 1 s'il n'est pas écrit). Au retour au calme, tout revient à un joueur. Sans ces clés, rien ne
+  change. Pour l'étage 1 : Passeur `vie: 12500, vie-groupe: 1.0, degats-groupe: {1: 0.4, 2: 0.7}` (même durée seul
+  qu'à six), élites `0.7`, Faucheuse `0.8`, Armure veuve `0.85`.
+- **API** : `VoraceMobAPI.joueursDuCombat(entite)` et `imposerJoueurs(entite, n)` (joueurs de l'arène d'un boss, pour le
+  plugin du donjon ; 0 rend le comptage à vorace-mob). `/vmob info` affiche `joueurs=`.
+- **Butin** : lignes `objet: item:<modèle>` (modèles de vorace-item : armes, armures, flèches), jusqu'ici ignorées. Un
+  exemplaire au rang de base du modèle et à une place tirée au hasard dans sa fourchette ; les objets qui ne s'empilent
+  pas tombent en autant d'exemplaires que le nombre tiré. `softdepend: [VoraceItem]`, appelé sans dépendance de
+  compilation : sans vorace-item, la ligne ne donne rien (signalée par `/vmob butin`).
+
 ## 1.6.1 (retours des essais en jeu du Seuil)
 
 - Un coup de mob ne repousse plus le joueur par le recul du jeu : seulement par son réglage `repousse`. Avant, chaque

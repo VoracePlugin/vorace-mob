@@ -55,6 +55,16 @@ import java.util.Locale;
  *   vie-max: 0.6             # seulement sous 60 % de Vie
  *   interruptible: true      # un contrôle pendant le signal l'annule
  *   animation-frappe: 7      # tic de l'animation où le geste frappe : elle est retardée pour qu'il tombe à la fin du signal
+ *   second-coup: { tic: 28, forme: cone, angle: 120, rayon: 2.2, multiplicateur: 0.5 }   # un 2e coup au tic 28 de l'attaque
+ *   munitions: 3             # elle use une munition du mob ({@code combat.munitions}) ; à zéro, elle ne part plus
+ *   apres-munitions: 3       # la recharge : seulement quand le mob n'a plus de munitions, elle les lui rend
+ *   invocation: { mob: e1_ame_enragee, nombre: 3, max: 6, total: 24 }   # au coup, ces mobs naissent autour de lui (6 en
+ *                            # même temps au plus, 24 sur tout le combat)
+ *   phase-max: 1             # seulement jusqu'à cette phase (0 : avant la première)
+ *   soin-allie: { cible: cire, seuil: 0.3, soin: 0.4 }   # soigne un allié de cette famille (combat.famille) sous 30 % de
+ *                            # Vie, à sa portée, de 40 % de sa Vie ; seulement s'il y en a un
+ *   interrompu-par: 2        # 2 coups reçus pendant le signal l'interrompent
+ *   # et les réglages du bestiaire ({@link Speciaux.Attaque}) : colle, trajectoire, sautable, cibles-min, appel...
  * </pre>
  */
 public record Competence(String id, String nom, String animation, Forme forme, double porteeMin, double porteeMax,
@@ -63,7 +73,46 @@ public record Competence(String id, String nom, String animation, Forme forme, d
                          int couleur, double poids, String annonce, String fixation, double vieMax, boolean interruptible,
                          int phase, double vitesse, double anticipation, int salve, int intervalle, int zones,
                          double dispersion, double repousse, double bond, int flaque, double flaqueMult, Effets effets,
-                         int presse, boolean lourde, int animationFrappe) {
+                         int presse, boolean lourde, int animationFrappe, SecondCoup secondCoup, boolean munitions,
+                         boolean rechargeMunitions, Invocation invocation, int phaseMax, SoinAllie soinAllie, int interrompuPar,
+                         Speciaux.Attaque sp) {
+
+    /** Mobs qui naissent autour de lui au coup ({@code max} en même temps, {@code total} sur le combat ; 0 : sans limite). */
+    public record Invocation(String mob, int nombre, int max, int total) {
+        static Invocation lire(ConfigurationSection s) {
+            if (s == null || s.getString("mob") == null) return null;
+            return new Invocation(s.getString("mob").toLowerCase(Locale.ROOT), Math.max(1, s.getInt("nombre", 1)), Math.max(0, s.getInt("max", 0)),
+                Math.max(0, s.getInt("total", 0)));
+        }
+    }
+
+    /** Soin d'un allié de la famille {@code cible} sous {@code seuil} de sa Vie : {@code soin} de sa Vie maximale. */
+    public record SoinAllie(String cible, double seuil, double soin) {
+        static SoinAllie lire(ConfigurationSection s) {
+            if (s == null) return null;
+            return new SoinAllie(s.getString("cible", "").toLowerCase(Locale.ROOT), Math.max(0, Math.min(1, s.getDouble("seuil", 0.3))),
+                Math.max(0, s.getDouble("soin", 0.4)));
+        }
+    }
+
+    /**
+     * Deuxième coup d'une attaque (Double coup de massue) : au tic {@code tic} depuis son début, une autre forme (cône,
+     * cercle ou ligne) frappe avec {@code multiplicateur}.
+     */
+    public record SecondCoup(int tic, Forme forme, double rayon, double largeur, double multiplicateur) {
+        static SecondCoup lire(String mob, String id, ConfigurationSection s, Competence.Forme defaut, double rayon, List<String> problemes) {
+            if (s == null) return null;
+            Forme f = Forme.lire(s.getString("forme"));
+            if (f == null) f = defaut;
+            if (f == Forme.PROJECTILE || f == Forme.ZONE) {
+                problemes.add("mob " + mob + " : attaque « " + id + " » : second-coup en cone, cercle, ligne ou contact seulement");
+                f = Forme.CONE;
+            }
+            double larg = s.contains("angle") ? s.getDouble("angle") : s.getDouble("largeur", f == Forme.CONE ? 90 : 1);
+            return new SecondCoup(Math.max(1, s.getInt("tic", 20)), f, Math.max(0.5, s.getDouble("rayon", rayon > 0 ? rayon : 2.5)),
+                Math.max(0, larg), Math.max(0, s.getDouble("multiplicateur", 0.5)));
+        }
+    }
 
     /** Modèles animés des effets d'une attaque (null : particules). */
     public record Effets(String marque, String projectile, String impact, String pluie, String flaque) {
@@ -111,7 +160,10 @@ public record Competence(String id, String nom, String animation, Forme forme, d
     public int departAnimation() { return animationFrappe > 0 && signal > animationFrappe ? signal - animationFrappe : 0; }
 
     /** Durée totale (signal + actif + récupération), en tics. */
-    public int total() { return signal + actif + recuperation + (salve - 1) * intervalle; }
+    public int total() {
+        int t = signal + actif + recuperation + (salve - 1) * intervalle;
+        return secondCoup == null ? t : Math.max(t, secondCoup.tic());
+    }
 
     /** Couleur RGB de la zone marquée par défaut selon le type. */
     static int couleurDuType(String type) {
@@ -186,6 +238,12 @@ public record Competence(String id, String nom, String animation, Forme forme, d
             Math.max(1, s.getInt("intervalle", 4)), Math.max(1, s.getInt("zones", 1)), Math.max(0, s.getDouble("dispersion", rayon * 1.4)),
             Math.max(0, s.getDouble("repousse", 0)), s.getDouble("bond", 0), Math.max(0, s.getInt("flaque", 0)),
             Math.max(0, s.getDouble("flaque-multiplicateur", 0.25)), Effets.lire(s.getConfigurationSection("effets")),
-            Math.max(0, s.getInt("presse", bond < 0 ? 2 : 0)), lourde, Math.max(0, s.getInt("animation-frappe", 0)));
+            Math.max(0, s.getInt("presse", bond < 0 ? 2 : 0)), lourde, Math.max(0, s.getInt("animation-frappe", 0)),
+            SecondCoup.lire(mob, id, s.getConfigurationSection("second-coup"), f, rayon, problemes),
+            s.isBoolean("munitions") ? s.getBoolean("munitions") : s.getInt("munitions", 0) > 0,
+            s.isBoolean("apres-munitions") ? s.getBoolean("apres-munitions") : s.getInt("apres-munitions", 0) > 0,
+            Invocation.lire(s.getConfigurationSection("invocation")), s.contains("phase-max") ? Math.max(0, s.getInt("phase-max")) : -1,
+            SoinAllie.lire(s.getConfigurationSection("soin-allie")), Math.max(0, s.getInt("interrompu-par", 0)),
+            Speciaux.Attaque.lire(s));
     }
 }

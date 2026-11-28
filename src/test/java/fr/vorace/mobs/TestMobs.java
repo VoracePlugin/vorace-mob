@@ -396,6 +396,242 @@ public final class TestMobs {
         verifier(lignes > 190 && absents == 0 && inst.contains("modeles-animes/fx_cire_goutte.bbmodel") && inst.contains("objets/vorace-mob-barre.yml"),
             "installation.txt : " + lignes + " fichiers, tous dans le jar");
 
+        // taille du groupe : Vie et dégâts (Passeur de l'étage 1 : 12 500 × joueurs, dégâts × 0,4 seul, × 0,7 à deux)
+        YamlConfiguration yg = YamlConfiguration.loadConfiguration(new java.io.StringReader(String.join("\n",
+            "passeur: { type: husk, combat: { niveau: 5, vie: 12500, rang: boss, vie-groupe: 1.0, degats-groupe: {1: 0.4, 2: 0.7} } }",
+            "garde: { type: husk, combat: { niveau: 3, vie: 900, rang: elite, vie-groupe: 0.7 } }",
+            "seul: { type: husk, combat: { niveau: 1, vie: 50 } }",
+            "faux: { type: husk, combat: { niveau: 1, vie: 50, degats-groupe: {zero: 2, 0: 0.5} } }")));
+        pb.clear();
+        Combat passeur = DefinitionMob.lire("passeur", yg.getConfigurationSection("passeur"), pb).combat();
+        Combat garde = DefinitionMob.lire("garde", yg.getConfigurationSection("garde"), pb).combat();
+        Combat seul = DefinitionMob.lire("seul", yg.getConfigurationSection("seul"), pb).combat();
+        verifier(pb.isEmpty() && passeur.suitLeGroupe() && garde.suitLeGroupe() && !seul.suitLeGroupe(), "vie-groupe et degats-groupe lus");
+        verifier(Math.abs(passeur.vieAuNiveau(5) * passeur.facteurVie(1) - 12500) < 1e-6
+            && Math.abs(passeur.vieAuNiveau(5) * passeur.facteurVie(6) - 75000) < 1e-6, "Passeur : 12 500 seul, 75 000 à six");
+        verifier(passeur.facteurDegats(1) == 0.4 && passeur.facteurDegats(2) == 0.7 && passeur.facteurDegats(3) == 1
+            && passeur.facteurDegats(0) == 0.4 && seul.facteurDegats(1) == 1, "Passeur : dégâts × 0,4 seul, × 0,7 à deux, × 1 à trois");
+        verifier(Math.abs(garde.facteurVie(3) - 2.4) < 1e-9 && garde.facteurVie(1) == 1 && seul.facteurVie(6) == 1, "élite k = 0,7 : Vie × 2,4 à trois");
+        // temps pour le tuer : le même seul qu'à six (Vie × joueurs, dégâts des joueurs × joueurs)
+        double dps = 70;
+        verifier(Math.abs(passeur.vieAuNiveau(5) * passeur.facteurVie(1) / dps - passeur.vieAuNiveau(5) * passeur.facteurVie(6) / (6 * dps)) < 1e-6,
+            "Passeur : même durée seul qu'à six (" + Math.round(12500 / dps) + " s à " + (int) dps + " dégâts/s)");
+        CoupMob cp = CoupMob.deBase(passeur).fois(passeur.facteurDegats(1));
+        verifier(cp.multiplicateur() == 0.4 && CoupMob.deBase(passeur).fois(1).multiplicateur() == 1, "coup de base × 0,4 seul");
+        pb.clear();
+        DefinitionMob.lire("faux", yg.getConfigurationSection("faux"), pb);
+        verifier(pb.size() == 2, "degats-groupe mal écrit : signalé (" + pb.size() + ")");
+        verifier(Butin.estItem("item:e1_fleche_os") && Butin.estItem(" ITEM:arc ") && !Butin.estItem("vorace:e1_os_aventurier")
+            && !Butin.estItem("minecraft:bone"), "butin : lignes « item:<modèle> » reconnues");
+        YamlConfiguration yb = YamlConfiguration.loadConfiguration(new java.io.StringReader(
+            "archer: { type: skeleton, combat: { niveau: 2, vie: 160, butin: [ { objet: \"item:e1_fleche_os\", chance: 0.6, nombre: [3, 6] } ] } }"));
+        pb.clear();
+        Combat archer = DefinitionMob.lire("archer", yb.getConfigurationSection("archer"), pb).combat();
+        verifier(pb.isEmpty() && archer.butin().size() == 1 && archer.butin().get(0).objet().equals("item:e1_fleche_os")
+            && archer.butin().get(0).min() == 3 && archer.butin().get(0).max() == 6, "butin : ligne item: lue (flèches en os ×3-6)");
+
+        // mécaniques du bestiaire : garde de face, point faible, mort qui invoque, pantins
+        YamlConfiguration yMeca = YamlConfiguration.loadConfiguration(new java.io.StringReader(String.join("\n",
+            "ossuaire: { type: skeleton, combat: { niveau: 2, vie: 200, garde: { reduction: 0.8, angle: 120, brise-apres: 3, ouverture: 20, animation: garde_brisee } } }",
+            "meche: { type: husk, combat: { niveau: 3, vie: 300, point-faible: { partie: meche, dos: true, multiplicateur: 2, fige: 80 } } }",
+            "mosaique: { type: skeleton, combat: { niveau: 1, vie: 100, a-la-mort: { invocation: e1_crane_qui_court, nombre: 1, depart: h_head } } }",
+            "pantin: { type: zombie, combat: { niveau: 1, vie: 100, jamais-mortel: true } }")));
+        pb.clear();
+        Mecaniques mOss = DefinitionMob.lire("ossuaire", yMeca.getConfigurationSection("ossuaire"), pb).combat().meca();
+        Mecaniques mm = DefinitionMob.lire("meche", yMeca.getConfigurationSection("meche"), pb).combat().meca();
+        Mecaniques ms = DefinitionMob.lire("mosaique", yMeca.getConfigurationSection("mosaique"), pb).combat().meca();
+        Mecaniques mp = DefinitionMob.lire("pantin", yMeca.getConfigurationSection("pantin"), pb).combat().meca();
+        verifier(pb.isEmpty() && mOss.garde() != null && mOss.garde().briseApres() == 3 && mOss.garde().reduction() == 0.8 && "garde_brisee".equals(mOss.garde().animation())
+            && mm.pointFaible() != null && mm.pointFaible().fige() == 80 && ms.aLaMort() != null && ms.aLaMort().mob().equals("e1_crane_qui_court")
+            && mp.jamaisMortel() && seul.meca() == Mecaniques.AUCUNE, "mécaniques lues : garde, point faible, a-la-mort, jamais-mortel");
+        // le mob regarde le sud (yaw 0 : +z) : un joueur au sud est devant, au nord dans son dos
+        double devant = Mecaniques.angle(0, 0, 5), dos = Mecaniques.angle(0, 0, -5), cote = Mecaniques.angle(0, 5, 0), yaw90 = Mecaniques.angle(90, -5, 0);
+        verifier(devant < 1 && dos > 179 && Math.abs(cote - 90) < 1 && yaw90 < 1, "angle vers l'attaquant : devant 0°, dos 180°, côté 90° (yaw 90 : regarde vers −x)");
+        verifier(mOss.devant(devant) && mOss.devant(55) && !mOss.devant(65) && !mOss.dos(dos) && mm.dos(dos) && mm.dos(125) && !mm.dos(100),
+            "garde sur 120° devant (60° de chaque côté) ; point faible dans le dos (au-delà de 120°)");
+        // points d'apparition : chance, groupe, XP, butin, pauses, entraide
+        YamlConfiguration ya = YamlConfiguration.loadConfiguration(new java.io.StringReader(String.join("\n",
+            "rare: { mob: e1_porte_fardeau, monde: donjon, centre: [1, 40, 2], chance: 0.35, reapparition: 600, groupe: r1b, xp-multiplicateur: 1.5, butin-bonus: { objet: \"vorace:cristal_azur\", nombre: 1 }, entraide: 0 }",
+            "chapelle: { mob: e1_meche_sourde, monde: donjon, centre: [1, 40, 2], cycle: 180, pause-si-salle: passeur, pause-max: 1200, pause-si-joueur: 24 }",
+            "simple: { mob: e1_meche_sourde, monde: donjon, centre: [1, 40, 2] }")));
+        pb.clear();
+        Apparition rare = Apparition.lire("rare", ya.getConfigurationSection("rare"), pb), chap = Apparition.lire("chapelle", ya.getConfigurationSection("chapelle"), pb),
+            simple = Apparition.lire("simple", ya.getConfigurationSection("simple"), pb);
+        verifier(pb.isEmpty() && rare.chance() == 0.35 && "r1b".equals(rare.groupe()) && rare.xpMult() == 1.5 && rare.bonus() != null
+            && rare.bonus().objet().equals("vorace:cristal_azur") && rare.bonus().min() == 1 && rare.entraide() == 0
+            && simple.chance() == 1 && simple.groupe() == null && simple.xpMult() == 1 && simple.bonus() == null && simple.entraide() == -1,
+            "points d'apparition : chance, groupe, xp-multiplicateur, butin-bonus, entraide (et leurs valeurs par défaut)");
+        verifier(chap.enPause(true, false, 60_000) && chap.enPause(false, true, 60_000) && !chap.enPause(false, false, 60_000)
+            && !chap.enPause(true, true, 1_200_000) && !simple.enPause(true, true, 0),
+            "Chapelle : pas de vague pendant le combat du Passeur ni sous les yeux d'un joueur, 1 200 s au plus");
+
+        // 1.9.0 : butin spécial, butin par membre, second coup, munitions, crâne qui court, tertre, ronde, phases
+        YamlConfiguration y9 = YamlConfiguration.loadConfiguration(new java.io.StringReader(String.join("\n",
+            "mosaique: { type: husk, combat: { niveau: 1, vie: 330, a-la-mort: { invocation: e1_crane_qui_court, nombre: 1, depart: h_head, delai: 7 },",
+            "  competences: { attaque_double: { forme: cone, rayon: 2.2, angle: 60, signal: 15, actif: 1, recuperation: 12, second-coup: { tic: 28, forme: cone, angle: 120, rayon: 2.2, multiplicateur: 0.5 } } },",
+            "  butin-special: [ { objet: \"vorace:e1_poussiere_os\", chance: 0.5, nombre: [1, 2], chasseur: true }, { objet: \"vorace:e1_bouclier_fendu\", chance: 0.05, si: garde_brisee },",
+            "    { objet: \"vorace:e1_meche_tressee\", chance: 0.1, si: par_branche_coupee }, { objet: \"vorace:cristal_azur\", chance: 1, nombre: 20, premier-kill: true } ] } }",
+            "crane: { type: silverfish, combat: { niveau: 1, vie: 10, duree-de-vie: 160, fuite: { vers: tas_os, rayon: 8 }, si-arrive: { releve: e1_squelette_mosaique, vie: 0.5, delai: 60 } } }",
+            "meche: { type: husk, combat: { niveau: 3, vie: 480, munitions: { nombre: 3, recharge: depot_de_cire }, competences: {",
+            "  goutte: { forme: projectile, portee: [4, 16], munitions: 3 }, recharge: { forme: contact, portee: 0, signal: 160, apres-munitions: 3 } } } }",
+            "gardien: { type: husk, combat: { niveau: 4, vie: 1500, rang: elite, tertre: { regen: 0.01, assis: true } } }",
+            "passeur: { type: husk, combat: { niveau: 5, vie: 12500, rang: boss, phases: [ { seuil: 0.6, animations: { garde: idle_a_pied, marche-combat: marche_a_pied } },",
+            "  { seuil: 0.25, animations: { garde: idle_garde } } ] } }",
+            "faucheuse: { type: husk, combat: { niveau: 5, vie: 13900, ronde: { points: [[230, 41], [229, 60], [236, 73]], arret: 300 } } }")));
+        pb.clear();
+        Combat c9 = DefinitionMob.lire("mosaique", y9.getConfigurationSection("mosaique"), pb).combat();
+        Combat cr9 = DefinitionMob.lire("crane", y9.getConfigurationSection("crane"), pb).combat();
+        Combat me9 = DefinitionMob.lire("meche", y9.getConfigurationSection("meche"), pb).combat();
+        Combat ga9 = DefinitionMob.lire("gardien", y9.getConfigurationSection("gardien"), pb).combat();
+        Combat pa9 = DefinitionMob.lire("passeur", y9.getConfigurationSection("passeur"), pb).combat();
+        Combat fa9 = DefinitionMob.lire("faucheuse", y9.getConfigurationSection("faucheuse"), pb).combat();
+        verifier(pb.isEmpty(), "1.9.0 : fiches lues sans problème " + pb);
+        Competence ad = c9.competences().get(0);
+        verifier(ad.secondCoup() != null && ad.secondCoup().tic() == 28 && ad.secondCoup().largeur() == 120 && ad.secondCoup().multiplicateur() == 0.5
+            && ad.total() == 28, "second coup lu (tic 28, cône 120°, × 0,5) ; l'attaque dure jusqu'à lui");
+        verifier(c9.meca().aLaMort().depart().equals("h_head") && c9.meca().aLaMort().delai() == 7, "a-la-mort : depuis l'os h_head, 7 tics après");
+        verifier(c9.butinSpecial().size() == 4 && c9.butinSpecial().get(0).chasseur() && "garde_brisee".equals(c9.butinSpecial().get(1).si())
+            && c9.butinSpecial().get(3).premierKill() && c9.butinSpecial().get(3).lot().min() == 20, "butin-special lu (chasseur, si, premier-kill)");
+        Combat.LotSpecial garde9 = c9.butinSpecial().get(1), branche9 = c9.butinSpecial().get(2);
+        verifier(garde9.chance(0) == 0 && garde9.chance(1) == 0.05 && garde9.chance(3) == 0.05 && branche9.chance(0) == 0
+            && Math.abs(branche9.chance(3) - 0.3) < 1e-9 && branche9.chance(20) == 1 && c9.butinSpecial().get(0).chance(0) == 0.5,
+            "conditions : « si » seulement si notée ; « par_... » × le nombre de fois (1 au plus)");
+        verifier(cr9.meca().dureeDeVie() == 160 && cr9.meca().fuite().vers().equals("tas_os") && cr9.meca().fuite().blocs().contains("bone_block")
+            && cr9.meca().siArrive().mob().equals("e1_squelette_mosaique") && cr9.meca().siArrive().vie() == 0.5 && cr9.meca().siArrive().delai() == 60,
+            "crâne qui court : 8 s de vie, fuit vers un tas d'os (bloc d'os), relève la Mosaïque à 50 % au bout de 3 s");
+        Competence goutte9 = me9.competences().stream().filter(x -> x.id().equals("goutte")).findFirst().get();
+        Competence rech = me9.competences().stream().filter(x -> x.id().equals("recharge")).findFirst().get();
+        verifier(me9.meca().munitions().nombre() == 3 && me9.meca().munitions().blocs().contains("honeycomb_block") && goutte9.munitions()
+            && !goutte9.rechargeMunitions() && rech.rechargeMunitions() && !rech.munitions(), "Mèche-sourde : 3 munitions, recharge au dépôt de cire");
+        verifier(ga9.meca().tertre().assis() && ga9.meca().tertre().regen() == 0.01 && ga9.meca().tertre().attente() == 200, "Gardien : assis, 1 % par seconde après 10 s");
+        verifier("idle_a_pied".equals(IACombat.animDePhase(pa9, 1, "garde")) && "marche_a_pied".equals(IACombat.animDePhase(pa9, 2, "marche-combat"))
+            && "idle_garde".equals(IACombat.animDePhase(pa9, 2, "garde")) && IACombat.animDePhase(pa9, 0, "garde") == null,
+            "Passeur : repos et marche à pied en phase 2, garde de la lanterne en phase 3");
+        Mecaniques.Ronde ro = fa9.meca().ronde();
+        int[] n1 = ro.suivant(1, 1), n2 = ro.suivant(2, 1), n3 = ro.suivant(0, -1);
+        verifier(ro.points().size() == 3 && ro.arret() == 300 && n1[0] == 2 && n2[0] == 1 && n2[1] == -1 && n3[0] == 1 && n3[1] == 1
+            && ro.bout(0) && ro.bout(2) && !ro.bout(1) && ro.plusProche(236, 70) == 2, "ronde : aller-retour, arrêt aux deux bouts");
+        java.util.UUID j9a = new java.util.UUID(0, 1), j9b = new java.util.UUID(0, 2), j9c = new java.util.UUID(0, 3);
+        java.util.Map<java.util.UUID, Double> dg9 = java.util.Map.of(j9a, 900.0, j9b, 95.0, j9c, 5.0);
+        verifier(Butin.membres(Combat.Rang.NORMAL, dg9, java.util.Map.of()).equals(List.of(j9a))
+            && Butin.membres(Combat.Rang.ELITE, dg9, java.util.Map.of(j9c, 120.0)).equals(List.of(j9a))
+            && Butin.membres(Combat.Rang.BOSS, java.util.Map.of(j9a, 500.0, j9b, 400.0), java.util.Map.of()).equals(List.of(j9a)),
+            "un seul butin par mob, au gagnant, même pour un élite ou un boss (pas de duplication)");
+        Apparition ap9 = Apparition.lire("faucheuse", YamlConfiguration.loadConfiguration(new java.io.StringReader(
+            "a: { mob: e1_faucheuse_errante, centre: [230.5, 41, 40.5], apparition: paroi, ronde: { points: [[230, 41], [229, 60]], arret: 300 } }")).getConfigurationSection("a"), pb);
+        verifier(ap9.paroi() && ap9.ronde() != null && ap9.ronde().points().size() == 2 && !simple.paroi() && simple.ronde() == null,
+            "points d'apparition : sortie de paroi et ronde lues");
+
+        // 1.10.0 : rang porté par les objets de butin (spectre)
+        Rangs rg = new Rangs();
+        pb.clear();
+        rg.lire("essai", YamlConfiguration.loadConfiguration(new java.io.StringReader(String.join("\n",
+            "objets:",
+            "  e1_crane_fele: { base: Peu commune, spectre: { Commune: 20, Peu commune: 70, Rare: 10 } }",
+            "  e1_eclat_lanterne: { base: rare, spectre: { peu_commun: 20, rare: 78, epique: 2 } }",
+            "  e1_os_aventurier: { base: commun }"))), pb);
+        Rangs.Spectre cf = rg.spectre("e1_crane_fele"), el = rg.spectre("E1_ECLAT_LANTERNE");
+        verifier(pb.isEmpty() && rg.taille() == 3 && cf.base().equals("peu_commun") && cf.tirer(0.1).equals("commun") && cf.tirer(0.5).equals("peu_commun")
+            && cf.tirer(0.95).equals("rare") && el.tirer(0.99).equals("epique") && rg.spectre("e1_os_aventurier").tirer(0.7).equals("commun"),
+            "rangs : spectre lu (noms du jeu ou identifiants), tirage du plus courant au plus rare");
+        verifier("peu_commun".equals(Rangs.lire("Peu commune")) && "divin".equals(Rangs.lire("Divine")) && "epique".equals(Rangs.lire("Épique"))
+            && Rangs.lire("bizarre") == null, "rangs : noms affichés reconnus");
+
+        // 1.11.0 : neutre, invocation, phase-max, soin d'allié, interrompu-par, éclair à la mort, aura, embuscade
+        YamlConfiguration y11 = YamlConfiguration.loadConfiguration(new java.io.StringReader(String.join("\n",
+            "glaneur: { type: husk, neutre: true, combat: { niveau: 4, vie: 900 } }",
+            "passeur: { type: husk, combat: { niveau: 5, vie: 1000, competences: { lanterne: { forme: cercle, rayon: 3, invocation: { mob: e1_ame_enragee, nombre: 3, max: 6, total: 24 } },",
+            "  taille: { forme: cone, rayon: 3, phase-max: 1 } } } }",
+            "mouliere: { type: husk, combat: { niveau: 3, vie: 500, famille: cire, competences: { refonte: { forme: contact, portee: 4, signal: 60,",
+            "  soin-allie: { cible: cire, seuil: 0.3, soin: 0.4 }, interrompu-par: 2 } } } }",
+            "phalene: { type: husk, combat: { niveau: 1, vie: 100, eclair-a-la-mort: { rayon: 6, aveuglement: 20 } } }",
+            "violon: { type: husk, combat: { niveau: 2, vie: 200, aura: { rayon: 10, degats: 0.2, purification: true } } }")));
+        pb.clear();
+        DefinitionMob gl11 = DefinitionMob.lire("glaneur", y11.getConfigurationSection("glaneur"), pb);
+        Combat pa11 = DefinitionMob.lire("passeur", y11.getConfigurationSection("passeur"), pb).combat();
+        Combat mo11 = DefinitionMob.lire("mouliere", y11.getConfigurationSection("mouliere"), pb).combat();
+        Combat ph11 = DefinitionMob.lire("phalene", y11.getConfigurationSection("phalene"), pb).combat();
+        Combat vi11 = DefinitionMob.lire("violon", y11.getConfigurationSection("violon"), pb).combat();
+        Competence lan = pa11.competences().stream().filter(x -> x.id().equals("lanterne")).findFirst().get();
+        Competence tai = pa11.competences().stream().filter(x -> x.id().equals("taille")).findFirst().get();
+        Competence ref = mo11.competences().get(0);
+        verifier(pb.isEmpty() && gl11.neutre() && lan.invocation().nombre() == 3 && lan.invocation().max() == 6 && lan.invocation().total() == 24
+            && tai.phaseMax() == 1 && lan.phaseMax() == -1 && "cire".equals(mo11.meca().famille()) && ref.soinAllie().soin() == 0.4
+            && ref.interrompuPar() == 2 && ph11.meca().eclairALaMort().aveuglement() == 20 && vi11.meca().aura().degats() == 0.2,
+            "neutre, invocation (max, total), phase-max, famille, soin d'allié, interrompu-par, éclair à la mort, aura");
+        Apparition ap11 = Apparition.lire("cache", YamlConfiguration.loadConfiguration(new java.io.StringReader(
+            "a: { mob: e1_squelette_rampant, centre: [122.5, 40, 298.5], cache: { eveil: 3 } }")).getConfigurationSection("a"), pb);
+        verifier(ap11.eveil() == 3 && simple.eveil() == 0, "embuscade : la vague attend un joueur à 3 blocs");
+
+        // 1.12.0 : comportements du bestiaire (lecture)
+        YamlConfiguration y12 = YamlConfiguration.loadConfiguration(new java.io.StringReader(String.join("\n",
+            "meche: { type: husk, combat: { niveau: 4, vie: 552, cible: lumiere, munitions: { nombre: 3 },",
+            "  parties: { branches: { os: [branche], nombre: 3, coups: 3, effet: un-tir-de-moins, condition: par_branche_coupee } },",
+            "  competences: { tir: { forme: projectile, portee: [4, 16], branches: [a, b, c], munitions: 3 },",
+            "    barrage: { forme: projectile, si: [branche_coupee, dernier_du_groupe], trajectoire: droite } } } }",
+            "sauteur: { type: husk, combat: { niveau: 2, vie: 330, perception: mouvement, sceau: { dos: 20, fige: 600, degats-dos: 1.5, evenement: e1.sceau_recolle } } }",
+            "cierge: { type: husk, combat: { niveau: 2, vie: 340, point-faible: { partie: meche, dos: true, multiplicateur: 2, fige: 80, evenement: e1.meche_eteinte },",
+            "  faiblesse: { Fire: 1.5, ramollit: 100 } } }",
+            "attentive: { type: husk, combat: { niveau: 4, vie: 1720, regard: { solide-si-regardee: true, aveugle-apres: 80, aveuglement: 40 },",
+            "  competences: { griffe: { forme: contact, portee: 2.5, seulement-hors-regard: true } } } }",
+            "faucheuse: { type: husk, combat: { niveau: 5, vie: 13900, vision: { devant: 12, derriere: 5, angle: 120, accroupi: 0.5 },",
+            "  competences: { fauchage: { forme: cone, rayon: 4, fragment-d-ame: { vie-max: -0.1, duree: 300, cumul: 3 } } } } }",
+            "passeur: { type: husk, combat: { niveau: 5, vie: 12500, tete-lanterne: { vie: 0.06, aveugle: 120, reforme: 400, degats-recus: 1.2 },",
+            "  lanterne-posee: { phase: 2, vie: 0.25, reduction-corps: 0.8 },",
+            "  competences: { charge: { forme: ligne, rayon: 12, contre-paroi: 60 }, garde: { forme: cercle, rayon: 4, centre: lanterne } } } }",
+            "veuve: { type: husk, combat: { niveau: 6, vie: 20600, formes: [0.5, 0.3, 0.2], recomposition: { duree: 60, piece-cassee-a: 0.08, perte-vie: 0.25, perte-degats: 0.1 } } }",
+            "glaneur: { type: husk, neutre: true, combat: { niveau: 4, vie: 1590, sac: { ramasse-apres: 600, sacs-max: 2, troc: true, evenement: e1.troc_glaneur } } }",
+            "lame: { type: husk, neutre: true, combat: { niveau: 3, vie: 850, invincible: { se-rend-a: 1 }, offrande: { interaction: 60, refus-max: 3, objet: vorace:e1_lame_orpheline } } }",
+            "fantome: { type: husk, ia: aucune, invulnerable: true, ronde: { points: [[236, 73], [200, 90]], vitesse: 3, boucle: false },",
+            "  regard: { angle: 120, portee: 12, portee-accroupi: 6, ligne-de-vue: true }, vu: { signal: 20, repousse: 6, vers: le_fil, evenement: e1.faucheuse_vu }, duree-de-vie: 1400 }")));
+        pb.clear();
+        Combat me12 = DefinitionMob.lire("meche", y12.getConfigurationSection("meche"), pb).combat();
+        Speciaux.Mob sme = me12.meca().sp();
+        Competence tir12 = me12.competences().stream().filter(x -> x.id().equals("tir")).findFirst().get();
+        Competence bar12 = me12.competences().stream().filter(x -> x.id().equals("barrage")).findFirst().get();
+        verifier(pb.isEmpty() && sme.cibleLumiere() && sme.parties().get("branches").coups() == 3 && "un-tir-de-moins".equals(sme.parties().get("branches").effet())
+            && sme.partieDeLOs("branche_haute") != null && tir12.sp().branches().size() == 3 && bar12.sp().si().size() == 2 && bar12.sp().droite()
+            && Bestiaire.lumiere(org.bukkit.Material.TORCH) == 14 && Bestiaire.lumiere(org.bukkit.Material.STONE) == 0,
+            "Mèche-sourde : cible la lumière, branches (parties), une animation par tir, barrage si branche coupée, tir tendu");
+        Speciaux.Mob ssa = DefinitionMob.lire("sauteur", y12.getConfigurationSection("sauteur"), pb).combat().meca().sp();
+        Speciaux.Mob sci = DefinitionMob.lire("cierge", y12.getConfigurationSection("cierge"), pb).combat().meca().sp();
+        Combat at12 = DefinitionMob.lire("attentive", y12.getConfigurationSection("attentive"), pb).combat();
+        Combat fa12 = DefinitionMob.lire("faucheuse", y12.getConfigurationSection("faucheuse"), pb).combat();
+        verifier(ssa.perceptionMouvement() && ssa.sceau().fige() == 600 && "e1.sceau_recolle".equals(ssa.sceau().evenement())
+            && "meche".equals(sci.pointFaiblePartie().partie()) && sci.faiblesse().types().get("fire") == 1.5 && sci.faiblesse().ramollit() == 100
+            && at12.meca().sp().regard().aveugleApres() == 80 && at12.competences().get(0).sp().horsRegard()
+            && fa12.meca().sp().vision().derriere() == 5 && fa12.competences().get(0).sp().fragment().cumul() == 3,
+            "Sauteur (mouvement, sceau), Cierge (mèche, feu), Attentive (regard), Faucheuse (vision, fragment d'âme)");
+        Combat pa12 = DefinitionMob.lire("passeur", y12.getConfigurationSection("passeur"), pb).combat();
+        Speciaux.Mob sve = DefinitionMob.lire("veuve", y12.getConfigurationSection("veuve"), pb).combat().meca().sp();
+        Speciaux.Mob sgl = DefinitionMob.lire("glaneur", y12.getConfigurationSection("glaneur"), pb).combat().meca().sp();
+        Speciaux.Mob sla = DefinitionMob.lire("lame", y12.getConfigurationSection("lame"), pb).combat().meca().sp();
+        verifier(pa12.meca().sp().teteLanterne().degatsRecus() == 1.2 && pa12.meca().sp().lanternePosee().phase() == 2
+            && pa12.competences().stream().anyMatch(x -> x.sp().contreParoi() == 60) && pa12.competences().stream().anyMatch(x -> "lanterne".equals(x.sp().centre()))
+            && sve.formes().size() == 3 && sve.recomposition().pieceCasseeA() == 0.08 && sgl.sac().sacsMax() == 2
+            && sla.invincible().seRendA() == 1 && sla.offrande().refusMax() == 3,
+            "Passeur (tête-lanterne, lanterne posée, charge contre paroi), Armure veuve (formes), Glaneur (sac), Lame-orpheline (offrande)");
+        DefinitionMob fan12 = DefinitionMob.lire("fantome", y12.getConfigurationSection("fantome"), pb);
+        verifier(pb.isEmpty() && fan12.quete().invulnerable() && fan12.quete().ronde().points().size() == 2 && fan12.quete().regard().porteeAccroupi() == 6
+            && fan12.quete().vu().repousse() == 6 && "e1.faucheuse_vu".equals(fan12.quete().vu().evenement()) && fan12.quete().dureeDeVie() == 1400,
+            "entité de quête : invulnérable, ronde, regard, vu (repousse vers le Fil), durée de vie");
+        verifier(DefinitionMob.lire("glaneur", y12.getConfigurationSection("glaneur"), pb).quete() == Speciaux.Quete.AUCUNE
+            && simple.toString() != null, "un mob de combat n'est pas une entité de quête");
+
+        Zone zp = Zone.lire("z", YamlConfiguration.loadConfiguration(new java.io.StringReader("z: { monde: donjon, rectangle: [0, 0, 10, 10], plafond: 12 }"))
+            .getConfigurationSection("z"), pb);
+        verifier(zp != null && zp.plafond() == 12 && zp.contient(5, 5), "plafond d'une zone");
+
+        // 1.13.0 : cycle raccourci quand plusieurs groupes de joueurs sont là
+        List<double[]> g13 = List.of(new double[]{0, 0}, new double[]{8, 0}, new double[]{15, 0}, new double[]{40, 40}, new double[]{60, 0});
+        verifier(Apparition.groupes(g13) == 3 && Apparition.groupes(List.of()) == 0 && Apparition.facteurGroupes(1) == 1
+            && Math.abs(Apparition.facteurGroupes(3) - 0.7) < 1e-9 && Apparition.facteurGroupes(9) == 0.6,
+            "groupes de joueurs (de proche en proche, 12 blocs) ; cycle × 0,85 par groupe en plus, 60 % au moins");
+        Apparition cy13 = Apparition.lire("c", YamlConfiguration.loadConfiguration(new java.io.StringReader(
+            "c: { mob: m, centre: [0, 0, 0], cycle: 100 }")).getConfigurationSection("c"), pb);
+        verifier(!cy13.vagueDue(1_000 + 69_000, 1_000, 0.7) && cy13.vagueDue(1_000 + 70_000, 1_000, 0.7) && !cy13.vagueDue(1_000 + 70_000, 1_000),
+            "cycle de 100 s : à 3 groupes, la vague revient au bout de 70 s");
+
         System.out.println(echecs == 0 ? "TOUS LES TESTS PASSENT" : echecs + " ECHEC(S)");
         System.exit(echecs == 0 ? 0 : 1);
     }
